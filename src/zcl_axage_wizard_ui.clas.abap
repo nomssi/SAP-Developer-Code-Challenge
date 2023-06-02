@@ -100,15 +100,18 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
         ( descr = 'Go to the room on the downstairs'   value = 'DOWN' )
         ( descr = 'Show Map/floor plan/Game world'  value = 'MAP' )
 
-        ( descr = 'Inventary - Show everything you carry'  value = 'INVENTARY' )
+        ( descr = 'Inventary - Show everything you carry'  value = 'INVENTORY' )
 
         ( descr = 'What is in the room?' value = 'LOOK' )
         ( descr = 'Look <object>'       value = 'LOOK' )
-        ( descr = 'Take <object>'  value = 'TAKE' )
+        ( descr = 'Pickup <object>'  value = 'PICKUP' )
         ( descr = 'Drop <object>'  value = 'DROP' )
         ( descr = 'Open <object>'  value = 'OPEN' )
         ( descr = 'Ask <person>'  value = 'ASK' )
         ( descr = 'Weld <subject> <object>'  value = 'WELD' )
+
+        ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
+        ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
          ).
 
   ENDMETHOD.
@@ -237,8 +240,8 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
     page->footer(
             )->overflow_toolbar(
         )->button(
-            text  = 'Take'
-            press = client->_event( 'TAKE' )
+            text  = 'Pickup'
+            press = client->_event( 'PICKUP' )
             enabled = abap_false
             icon = 'sap-icon://cart-3'
         )->button(
@@ -260,7 +263,7 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
 *            text  = 'Weld'
 *            press = client->_event( 'WELD' )
 *            enabled = abap_true
-                )->button( text = 'Inventary'
+                )->button( text = 'Inventory'
                            class = 'sapUiTinyMarginBeginEnd'
                            press = client->_event( 'INV' )
                            icon = 'sap-icon://menu'  " 'sap-icon://cart'
