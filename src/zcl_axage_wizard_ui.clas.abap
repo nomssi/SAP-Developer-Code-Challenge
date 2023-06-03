@@ -11,6 +11,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA anzahl_items TYPE string VALUE '0'.
     DATA results TYPE string.
     DATA help TYPE string.
+    DATA help_html TYPE string.
 
     TYPES:
       BEGIN OF ts_suggestion_items,
@@ -113,6 +114,33 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
         ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
         ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
          ).
+
+     help_html =
+      |<h2>Help</h2><p>| &
+      |<h3>Navigation Commands</h3><ul>| &&
+      |<li>MAP        <em>Show map/ floor plan/ world</em>| &&
+      |<li>N or NORTH <em>Walk to the room on the north side</em>| &&
+      |<li>E or EAST  <em>Walk to the room on the east side</em>| &&
+      `<li>S or SOUTH <em>Walk to the room on the south side</em>` &&
+      `<li>W or WEST  <em>Walk to the room on the west side</em>` &&
+      `<li>U or UP    <em>Go to the room upstairs</em>` &&
+      `<li>D or DOWN  <em>Go to the room downstairs</em></ul><p>`.
+
+      help_html = help_html &&
+      |<h3>Interaction with Objects</h3>| &&
+      |<ul><li>INV or INVENTORY <em>View everything you ae carrying</em>| &&
+      `<li>LOOK <em>Describe your environment</em>` &&
+      `<li>LOOK object     <em>Have a closer look at the object in the room or in your inventory</em>` &&
+      `<li>PICKUP object   <em>Pickup an object in the current place</em>` &&
+      `<li>DROP object     <em>Drop an object that you carry</em>` &&
+      `<li>OPEN object     <em>Open something that is in the room</em></ul><p>`.
+
+      help_html = help_html &&
+      |<h3>Other Commands</h3><ul>| &&
+      `<li>ASK person            <em>Ask a person to tell you something</em>` &&
+      `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
+      `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
+      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`.
 
   ENDMETHOD.
 
@@ -232,10 +260,18 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
 
     page->grid( 'L8 M8 S8' )->content( 'layout' ).
     grid->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
-        )->code_editor( value = client->_bind( results ) editable = 'false' type = `plain_text`
-                      height = '600px'
-        )->text_area( value = client->_bind( help ) editable = 'false' growingmaxlines = '40' growing = abap_True
-                      height = '600px' ).
+        )->code_editor( value = client->_bind( results )
+                        editable = 'false'
+                        type = `plain_text`
+                        height = '600px'
+         )->vbox( 'sapUiSmallMargin'
+                )->formatted_text( help_html
+*        )->text_area( value = client->_bind( help )
+*                      editable = 'false'
+*                      growingmaxlines = '40'
+*                      growing = abap_True
+*                      height = '600px'
+       ).
 
     page->footer(
             )->overflow_toolbar(
