@@ -7,7 +7,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     INTERFACES z2ui5_if_app.
 
     DATA command TYPE string.
-    DATA auto_look TYPE xsdboolean.
+    DATA auto_look TYPE xsdboolean VALUE abap_true.
     DATA anzahl_items TYPE string VALUE '0'.
     DATA results TYPE string.
     DATA help TYPE string.
@@ -21,6 +21,19 @@ CLASS zcl_axage_wizard_ui DEFINITION
 
     DATA mt_suggestion TYPE STANDARD TABLE OF ts_suggestion_items WITH EMPTY KEY.
 
+    TYPES:
+      BEGIN OF ty_file,
+        selkz  TYPE abap_bool,
+        name   TYPE string,
+        format TYPE string,
+        size   TYPE string,
+        descr  TYPE string,
+        data   TYPE string,
+      END OF ty_file.
+
+    DATA mt_file TYPE STANDARD TABLE OF ty_file WITH EMPTY KEY.
+    DATA ms_file_prev TYPE ty_file.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA engine TYPE REF TO zcl_axage_engine.
@@ -31,7 +44,23 @@ ENDCLASS.
 
 
 
-CLASS zcl_axage_wizard_ui IMPLEMENTATION.
+CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
+
+
+  METHOD execute.
+    DATA(result) = engine->interprete( command = command
+                                       auto_look = auto_look ).
+    anzahl_items = lines( engine->player->things->get_list( ) ).
+
+    IF engine->player->location->things->exists( 'RFC' ).
+      "AND engine->player->location->name = bill_developer->location->name.
+
+      engine->mission_completed = abap_true.
+      result->add( 'Congratulations! You delivered the RFC to the developers!' ).
+    ENDIF.
+
+    results = |You are in { engine->player->location->description }.\n| && result->get(  ).
+  ENDMETHOD.
 
 
   METHOD init_game.
@@ -46,16 +75,18 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
     engine->map->add_room( garden ).
     engine->map->set_floor_plan( VALUE #(
       ( `+--------------------+` )
-      ( `| Welding Torch      |` )
+      ( `| Welding            |` )
+      ( `|  Torch             |` )
       ( `|                    |` )
-      ( `|        ATTIC       |` )
+      ( `|       ATTIC        |` )
       ( `|                    |` )
       ( `+--------+  +--------+` )
       ( `         |__| ` )
       ( `  Ladder |  | ` )
       ( `+--------+  +--------+ +----------------+` )
       ( `|              Bucket| | Frog           |` )
-      ( `|     LIVING         | |      Well      |` )
+      ( `|mop                 | |                |` )
+      ( `|     LIVING         | |        Well    |` )
       ( `|      ROOM          +-+                |` )
       ( `|                    Door    GARDEN     |` )
       ( `|  Sleeping          +-+                |` )
@@ -70,22 +101,98 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
       d = living_room ).
     garden->set_exits(
       w = living_room ).
-    DATA(wizard) = NEW zcl_axage_thing( name = 'WIZARD' descr = 'snoring loudly on the couch' ).
+    DATA(wizard) = NEW zcl_axage_thing( name = 'WIZARD' state = 'snoring loudly on the couch' descr = ''
+     can_be_pickup = abap_false
+     can_be_drop = abap_false
+     can_be_splash_into = abap_true
+     can_be_dunk_into = abap_false ).
     living_room->things->add( wizard ).
-    DATA(whiskey) = NEW zcl_axage_thing( name = 'BOTTLE' descr = 'whiskey on the floor' ).
+
+    DATA(whiskey) = NEW zcl_axage_thing( name = 'BOTTLE' state = 'on the floor' descr = 'whiskey'  ).
     living_room->things->add( whiskey ).
-    DATA(bucket) = NEW zcl_axage_thing( name = 'BUCKET' descr = 'on the floor' ).
+
+    DATA(bucket) = NEW zcl_axage_thing( name = 'BUCKET' state = 'on the floor' descr = ''
+     can_be_weld = abap_true
+     can_be_splash_into = abap_true
+     can_be_dunk_into = abap_true ).
     living_room->things->add( bucket ).
 
-    DATA(well) = NEW zcl_axage_thing( name = 'WELL' descr = 'in front of you' ).
+    DATA(mop) = NEW zcl_axage_thing( name = 'MOP' state = 'on the floor' descr = ''
+     can_be_dunk_into = abap_true ).
+    living_room->things->add( mop ).
+
+    DATA(content_of_fireplace) = NEW zcl_axage_thing_list( ).
+    content_of_fireplace->add( NEW zcl_axage_thing( name = 'ASHES'
+       descr = 'enchanted ashes'  state = 'from past magical fires'  ) ).
+
+    DATA(needed_to_open_fireplace) = NEW zcl_axage_thing_list(  ).
+
+    DATA(fireplace) = NEW zcl_axage_openable_thing(
+      name = 'FIREPLACE'
+      descr = 'carved with arcane symbols'
+      state = 'its grate is filled with ashes'
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      content = content_of_fireplace
+      needed  = needed_to_open_fireplace ).
+    living_room->things->add( fireplace ).
+
+    DATA(bookshelf_key) = NEW zcl_axage_thing( name = 'SMALL KEY' state = '' descr = 'for a bookshelf?' ).
+    living_room->things->add( bookshelf_key ).
+
+    DATA(needed_to_open_tome) = NEW zcl_axage_thing_list( ).
+
+    DATA(content_of_tome) = NEW zcl_axage_thing_list( ).
+    content_of_tome->add( NEW zcl_axage_thing( name = 'SPELL' state = ''
+       descr = '"Illuminara", which can be used to light up dark places.' ) ).
+    DATA(tome) = NEW zcl_axage_openable_thing(
+      name    = 'TOME'
+      descr   = 'Magic Tome wiht arcane spells'
+      content = content_of_tome
+      needed  = needed_to_open_tome ).
+
+    DATA(content_of_bookshelf) = NEW zcl_axage_thing_list( ).
+    content_of_bookshelf->add( tome ).
+
+    DATA(needed_to_open_bookshelf) = NEW zcl_axage_thing_list(  ).
+    needed_to_open_bookshelf->add( bookshelf_key ).
+
+    DATA(bookshelf) = NEW zcl_axage_openable_thing( name = 'BOOKSHELF'
+                           descr = 'with magic tomes'
+                           state = 'closed'
+                           can_be_open = abap_true
+                           can_be_pickup = abap_false
+                           can_be_drop = abap_false
+                           content = content_of_bookshelf
+                           needed  = needed_to_open_bookshelf ).
+    living_room->things->add( bookshelf ).
+
+    DATA(painting) = NEW zcl_axage_thing( name = 'PAINTING' state = 'with the title The Guild''s Trial'
+       descr = 'depiction of the Orb of Sunlight, the Potion of Infinite Stars, and the Staff of Eternal Moon'
+     can_be_pickup = abap_false
+     can_be_drop = abap_false ).
+    living_room->things->add( painting ).
+
+
+    DATA(well) = NEW zcl_axage_thing( name = 'WELL' state = 'in front of you' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      can_be_dunk_into = abap_true
+      can_be_splash_into = abap_true ).
     garden->things->add( well ).
-    DATA(frog) = NEW zcl_axage_thing( name = 'FROG' descr = 'on the floor' ).
+
+    DATA(frog) = NEW zcl_axage_thing( name = 'FROG' state = 'on the floor' descr = ''  ).
     garden->things->add( frog ).
-    DATA(chain) = NEW zcl_axage_thing( name = 'CHAIN' descr = 'on the floor' ).
+
+    DATA(chain) = NEW zcl_axage_thing( name = 'CHAIN' state = ' the floor' descr = ''
+      can_be_weld = abap_true ).
     garden->things->add( chain ).
 
-    DATA(welding_torch) = NEW zcl_axage_thing( name = 'WELDING TORCH'
-      descr = 'in the corner' ).
+    DATA(welding_torch) = NEW zcl_axage_thing( name = 'WELDING TORCH' state = ''
+      descr = 'in the corner'
+       can_weld = abap_true
+       can_be_pickup = abap_false
+       can_be_drop = abap_false ).
     attic->things->add( welding_torch ).
 
 
@@ -108,16 +215,16 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
         ( descr = 'Pickup <object>'  value = 'PICKUP' )
         ( descr = 'Drop <object>'  value = 'DROP' )
         ( descr = 'Open <object>'  value = 'OPEN' )
+
         ( descr = 'Ask <person>'  value = 'ASK' )
         ( descr = 'Weld <subject> <object>'  value = 'WELD' )
-
         ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
         ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
          ).
 
      help_html =
       |<h2>Help</h2><p>| &
-      |<h3>Navigation Commands</h3><ul>| &&
+      |<h3>Navigation</h3><ul>| &&
       |<li>MAP        <em>Show map/ floor plan/ world</em>| &&
       |<li>N or NORTH <em>Walk to the room on the north side</em>| &&
       |<li>E or EAST  <em>Walk to the room on the east side</em>| &&
@@ -127,35 +234,46 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
       `<li>D or DOWN  <em>Go to the room downstairs</em></ul><p>`.
 
       help_html = help_html &&
-      |<h3>Interaction with Objects</h3>| &&
-      |<ul><li>INV or INVENTORY <em>View everything you ae carrying</em>| &&
+      |<h3>Interaction</h3>| &&
+      |<ul><li>INV or INVENTORY <em>View everything you are carrying</em>| &&
       `<li>LOOK <em>Describe your environment</em>` &&
       `<li>LOOK object     <em>Have a closer look at the object in the room or in your inventory</em>` &&
-      `<li>PICKUP object   <em>Pickup an object in the current place</em>` &&
+      `<li>PICKUP object   (or TAKE) <em>Pickup an object in the current place</em>` &&
       `<li>DROP object     <em>Drop an object that you carry</em>` &&
       `<li>OPEN object     <em>Open something that is in the room</em></ul><p>`.
 
       help_html = help_html &&
-      |<h3>Other Commands</h3><ul>| &&
+      |<h3>Other</h3><ul>| &&
       `<li>ASK person            <em>Ask a person to tell you something</em>` &&
       `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
       `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
-      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`.
+      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`  &&
+      `<pre>` &&
+        '              _,._       ' && '<br>' &&
+        '  .||,       /_ _\\\\     ' && '<br>' &&
+        ' \.`'',/      |''L''| |     ' && '<br>' &&
+        ' = ,. =      | -,| L     ' && '<br>' &&
+        ' / || \    ,-''\"/,''`.    ' && '<br>' &&
+        '   ||     ,''   `,,. `.  ' && '<br>' &&
+        '   ,|____,'' , ,;'' \| |   ' && '<br>' &&
+        '  (3|\    _/|/''   _| |   ' && '<br>' &&
+        '   ||/,-''   | >-'' _,\\\\ ' && '<br>' &&
+        '   ||''      ==\ ,-''  ,''  ' && '<br>' &&
+        '   ||       |  V \ ,|    ' && '<br>' &&
+        '   ||       |    |` |    ' && '<br>' &&
+        '   ||       |    |   \   ' && '<br>' &&
+        '   ||       |    \    \  ' && '<br>' &&
+        '   ||       |     |    \ ' && '<br>' &&
+        '   ||       |      \_,-'' ' && '<br>' &&
+        '   ||       |___,,--")_\ ' && '<br>' &&
+        '   ||         |_|   ccc/ ' && '<br>' &&
+        '   ||        ccc/        ' && '<br>' &&
+        '   ||                hjm ' && '<br>' &&
+        `</pre>`.
+
 
   ENDMETHOD.
 
-  METHOD execute.
-    DATA(result) = engine->interprete( command = command
-                                       auto_look = auto_look ).
-    anzahl_items = lines( engine->player->things->get_list( ) ).
-
-    IF engine->player->location->things->exists( 'RFC' ).
-      engine->mission_completed = abap_true.
-      result->add( 'Congratulations! You delivered the RFC to the developers!' ).
-    ENDIF.
-
-    results = |You are in { engine->player->location->description }.\n| && result->get(  ).
-  ENDMETHOD.
 
   METHOD z2ui5_if_app~main.
     IF check_initialized = abap_false.
@@ -183,7 +301,7 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
     DATA(view) = z2ui5_cl_xml_view=>factory( )->shell( ).
     DATA(page) = view->page(
       id =           'id_page'
-      title          = 'abap2UI5 and AXAGE - The Wizard''s Adventure Game'
+      title          = 'The Wizard''s Adventure Game'
       navbuttonpress = client->_event( 'BACK' )
       shownavbutton  = abap_true ).
 
@@ -198,6 +316,17 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
              text = 'Map'
              press = client->_event( 'MAP' )
              icon  = 'sap-icon://map-2'
+        )->button( text = 'Inventory'
+                   class = 'sapUiTinyMarginBeginEnd'
+                   press = client->_event( 'INV' )
+                   icon = 'sap-icon://menu'  " 'sap-icon://cart'
+             )->get( )->custom_data(
+                        )->badge_custom_data(
+                            key     = 'items'
+                            value   = anzahl_items
+                            visible = abap_true
+        )->get_parent( )->get_parent(
+
         )->toolbar_spacer(
 
         )->button(
@@ -233,7 +362,7 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
 
     DATA(grid) = page->grid( 'L12 M12 S12' )->content( 'layout' ).
     grid->simple_form(
-        title =  'abap2UI5 and AXAGE - The Wizard''s Adventure Game'
+        title =  'abap2UI5 and AXAGE Adventure Game - The Wizard''s Guild Trials'
         editable = abap_true
         )->content( 'form'
             )->label( 'Always Look'
@@ -259,19 +388,22 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
                                additionaltext = '{DESCR}' ).
 
     page->grid( 'L8 M8 S8' )->content( 'layout' ).
-    grid->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
+    grid->simple_form( title = 'Game Console - Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
         )->code_editor( value = client->_bind( results )
                         editable = 'false'
                         type = `plain_text`
                         height = '600px'
          )->vbox( 'sapUiSmallMargin'
                 )->formatted_text( help_html
+
 *        )->text_area( value = client->_bind( help )
 *                      editable = 'false'
 *                      growingmaxlines = '40'
 *                      growing = abap_True
 *                      height = '600px'
        ).
+
+"    page->zz_plain( '<html:iframe src="https://github.com/nomssi/SAP-Developer-Code-Challenge/blob/main/img/livingroom.jpg" height="75%" width="98%"/>' ).
 
     page->footer(
             )->overflow_toolbar(
@@ -299,17 +431,6 @@ CLASS zcl_axage_wizard_ui IMPLEMENTATION.
 *            text  = 'Weld'
 *            press = client->_event( 'WELD' )
 *            enabled = abap_true
-                )->button( text = 'Inventory'
-                           class = 'sapUiTinyMarginBeginEnd'
-                           press = client->_event( 'INV' )
-                           icon = 'sap-icon://menu'  " 'sap-icon://cart'
-                     )->get( )->custom_data(
-                                )->badge_custom_data(
-                                    key     = 'items'
-                                    value   = anzahl_items
-                                    visible = abap_true
-                )->get_parent( )->get_parent(
-
                 )->toolbar_spacer(
         )->link(
              text = 'Credits'
