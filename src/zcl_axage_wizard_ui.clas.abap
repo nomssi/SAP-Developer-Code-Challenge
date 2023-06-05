@@ -56,7 +56,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       "AND engine->player->location->name = bill_developer->location->name.
 
       engine->mission_completed = abap_true.
-      result->add( 'Congratulations! You delivered the RFC to the developers!' ).
+      result->add( 'Congratulations! You are now member of the Wizard''s Guild' ).
     ENDIF.
 
     results = |You are in { engine->player->location->description }.\n| && result->get(  ).
@@ -67,7 +67,8 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     engine = NEW #( ).
     " Nodes
     DATA(living_room) = NEW zcl_axage_room( name = 'Living Room' descr = 'the living-room of a wizard''s house.' ).
-    DATA(attic)  = NEW zcl_axage_room( name = 'Attic'  descr = 'the attic.' ).
+    DATA(attic)  = NEW zcl_axage_room( name = 'Attic'  descr = 'the attic.'
+       state = 'The attic is dark' ).
     DATA(garden) = NEW zcl_axage_room( name = 'Garden'  descr = 'a beautiful garden.' ).
 
     engine->map->add_room( living_room ).
@@ -101,6 +102,16 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       d = living_room ).
     garden->set_exits(
       w = living_room ).
+
+**LIVING ROOM**:
+"- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
+"- When you **LOOK** at the Fireplace, you find Ashes.
+"- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
+"- When you **LOOK** at the Bookshelf, you find a Magic Tome.
+"- When you **PICKUP** the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
+"- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
+
+
     DATA(wizard) = NEW zcl_axage_thing( name = 'WIZARD' state = 'snoring loudly on the couch' descr = ''
      can_be_pickup = abap_false
      can_be_drop = abap_false
@@ -137,7 +148,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       needed  = needed_to_open_fireplace ).
     living_room->things->add( fireplace ).
 
-    DATA(bookshelf_key) = NEW zcl_axage_thing( name = 'SMALL KEY' state = '' descr = 'for a bookshelf?' ).
+    DATA(bookshelf_key) = NEW zcl_axage_thing( name = 'KEY' state = '' descr = 'it is small' ).
     living_room->things->add( bookshelf_key ).
 
     DATA(needed_to_open_tome) = NEW zcl_axage_thing_list( ).
@@ -147,7 +158,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
        descr = '"Illuminara", which can be used to light up dark places.' ) ).
     DATA(tome) = NEW zcl_axage_openable_thing(
       name    = 'TOME'
-      descr   = 'Magic Tome wiht arcane spells'
+      descr   = 'Magic Tome with arcane spells'
       content = content_of_tome
       needed  = needed_to_open_tome ).
 
@@ -174,6 +185,36 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     living_room->things->add( painting ).
 
 
+**GARDEN**:
+
+"- When you **LOOK** around, you find a Pond, a Flower Bed, and a Shed.
+"- When you **LOOK** at the Flower Bed, you see a Sunflower.
+"- When you **PICKUP** the Sunflower and **WELD** it with the Ashes from the Fireplace, you obtain the Orb of Sunlight.
+"- When you **LOOK** at the Pond, you notice that it's too dark to see anything.
+"- When you cast "Illuminara" on the Pond, you see a Bottle at the bottom.
+"- When you **PICKUP** the Bottle, you discover it's a Potion of Infinite Stars.
+"- The Shed is locked. The key can be found in the Attic.
+
+    DATA(pond) = NEW zcl_axage_thing( name = 'POND'
+      state = 'it is dark' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      can_be_dunk_into = abap_true
+      can_be_splash_into = abap_true ).
+    garden->things->add( pond ).
+
+    DATA(flower) = NEW zcl_axage_thing( name = 'FLOWER'
+      state = 'in a flower bed' descr = 'it is a Sunflower'
+      can_be_pickup = abap_false
+      can_be_drop = abap_false ).
+    garden->things->add( flower ).
+
+    DATA(sched) = NEW zcl_axage_thing( name = 'SCHED'
+      state = 'it is locked' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false ).
+    garden->things->add( sched ).
+
     DATA(well) = NEW zcl_axage_thing( name = 'WELL' state = 'in front of you' descr = ''
       can_be_pickup = abap_false
       can_be_drop = abap_false
@@ -187,6 +228,28 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     DATA(chain) = NEW zcl_axage_thing( name = 'CHAIN' state = ' the floor' descr = ''
       can_be_weld = abap_true ).
     garden->things->add( chain ).
+
+**ATTIC**:
+
+"- The Attic is dark. Use "Illuminara" to light up the space.
+"- When you **LOOK** around, you find a Chest, a Workbench, and a Moon-crested Key.
+"- When you **PICKUP** the Moon-crested Key, you can use this to open the Shed in the Garden.
+"- When you **OPEN** the Chest, you find an old Magic Staff.
+"- When you **PICKUP** the Magic Staff and **DUNK** it into the Potion of Infinite Stars, then **SPLASH** the Orb of Sunlight onto the combined items, you obtain the Staff of Eternal Moon.
+
+    DATA(chest) = NEW zcl_axage_thing( name = 'CHEST' state = ''
+      descr = 'on the floor' ).
+    attic->things->add( chest ).
+
+    DATA(workbench) = NEW zcl_axage_thing( name = 'WORKBENCH' state = ''
+      descr = 'on the corner'
+       can_be_pickup = abap_false
+       can_be_drop = abap_false ).
+    attic->things->add( workbench ).
+
+    DATA(sched_key) = NEW zcl_axage_thing( name = 'BIG KEY' state = 'on the workbench'
+      descr = 'it is moon-crested' ).
+    attic->things->add( sched_key ).
 
     DATA(welding_torch) = NEW zcl_axage_thing( name = 'WELDING TORCH' state = ''
       descr = 'in the corner'
@@ -217,6 +280,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
         ( descr = 'Open <object>'  value = 'OPEN' )
 
         ( descr = 'Ask <person>'  value = 'ASK' )
+        ( descr = 'Cast <spell>'  value = 'CAST' )
         ( descr = 'Weld <subject> <object>'  value = 'WELD' )
         ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
         ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
@@ -245,6 +309,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       help_html = help_html &&
       |<h3>Other</h3><ul>| &&
       `<li>ASK person            <em>Ask a person to tell you something</em>` &&
+      `<li>CAST spell            <em>Cast a spell you have learned before</em>` &&
       `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
       `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
       `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`  &&
