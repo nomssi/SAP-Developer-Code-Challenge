@@ -472,6 +472,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                 text  = 'Execute'
                 press = client->_event( 'BUTTON_POST' ) ).
 
+    IF image_data IS NOT INITIAL.
+      page->image( src = image_data ).
+    ENDIF.
+
     page->grid( 'L8 M8 S8' )->content( 'layout' ).
     grid->simple_form( title = 'Game Console - Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
         )->code_editor( value = client->_bind( results )
@@ -488,9 +492,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 *                      height = '600px'
        ).
 
-    IF image_data IS NOT INITIAL.
-      page->zz_plain( '<html:iframe src="' && image_data && '" height="75%" width="98%"/>' ).
-    ENDIF.
 
     page->footer(
             )->overflow_toolbar(
