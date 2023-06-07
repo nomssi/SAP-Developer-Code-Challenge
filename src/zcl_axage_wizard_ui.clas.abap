@@ -14,6 +14,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA help_html TYPE string.
 
     DATA last_message TYPE string.
+    DATA current_location TYPE string.
     DATA strip_type TYPE string.
     DATA image_data TYPE string.
 
@@ -70,7 +71,8 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       result->add( 'Congratulations! You are now member of the Wizard''s Guild' ).
     ENDIF.
 
-    results = |You are in { engine->player->location->description }.\n| && result->get(  ).
+    results = result->get(  ).
+    current_location = |You are in { engine->player->location->description }|.
     image_data = engine->player->location->image_data.
   ENDMETHOD.
 
@@ -306,6 +308,29 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
          ).
 
      help_html =
+      `<pre>` &&
+        '              _,._       ' && '<br>' &&
+        '  .||,       /_ _\\\\     ' && '<br>' &&
+        ' \.`'',/      |''L''| |     ' && '<br>' &&
+        ' = ,. =      | -,| L     ' && '<br>' &&
+        ' / || \    ,-''\"/,''`.    ' && '<br>' &&
+        '   ||     ,''   `,,. `.  ' && '<br>' &&
+        '   ,|____,'' , ,;'' \| |   ' && '<br>' &&
+        '  (3|\    _/|/''   _| |   ' && '<br>' &&
+        '   ||/,-''   | >-'' _,\\\\ ' && '<br>' &&
+        '   ||''      ==\ ,-''  ,''  ' && '<br>' &&
+        '   ||       |  V \ ,|    ' && '<br>' &&
+        '   ||       |    |` |    ' && '<br>' &&
+        '   ||       |    |   \   ' && '<br>' &&
+        '   ||       |    \    \  ' && '<br>' &&
+        '   ||       |     |    \ ' && '<br>' &&
+        '   ||       |      \_,-'' ' && '<br>' &&
+        '   ||       |___,,--")_\ ' && '<br>' &&
+        '   ||         |_|   ccc/ ' && '<br>' &&
+        '   ||        ccc/        ' && '<br>' &&
+        '   ||                hjm ' && '<br>' &&
+        `</pre>` &&
+
       |<h2>Help</h2><p>| &
       |<h3>Navigation</h3><ul>| &&
       |<li>MAP        <em>Show map/ floor plan/ world</em>| &&
@@ -331,29 +356,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       `<li>CAST spell            <em>Cast a spell you have learned before</em>` &&
       `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
       `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
-      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`  &&
-      `<pre>` &&
-        '              _,._       ' && '<br>' &&
-        '  .||,       /_ _\\\\     ' && '<br>' &&
-        ' \.`'',/      |''L''| |     ' && '<br>' &&
-        ' = ,. =      | -,| L     ' && '<br>' &&
-        ' / || \    ,-''\"/,''`.    ' && '<br>' &&
-        '   ||     ,''   `,,. `.  ' && '<br>' &&
-        '   ,|____,'' , ,;'' \| |   ' && '<br>' &&
-        '  (3|\    _/|/''   _| |   ' && '<br>' &&
-        '   ||/,-''   | >-'' _,\\\\ ' && '<br>' &&
-        '   ||''      ==\ ,-''  ,''  ' && '<br>' &&
-        '   ||       |  V \ ,|    ' && '<br>' &&
-        '   ||       |    |` |    ' && '<br>' &&
-        '   ||       |    |   \   ' && '<br>' &&
-        '   ||       |    \    \  ' && '<br>' &&
-        '   ||       |     |    \ ' && '<br>' &&
-        '   ||       |      \_,-'' ' && '<br>' &&
-        '   ||       |___,,--")_\ ' && '<br>' &&
-        '   ||         |_|   ccc/ ' && '<br>' &&
-        '   ||        ccc/        ' && '<br>' &&
-        '   ||                hjm ' && '<br>' &&
-        `</pre>`.
+      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`.
 
 
   ENDMETHOD.
@@ -444,9 +447,11 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
              icon  = 'sap-icon://sys-help'
        )->get_parent( ).
 
-    DATA(grid) = page->grid( 'L12 M12 S12' )->content( 'layout' ).
-    grid->simple_form(
-        title =  'abap2UI5 and AXAGE Adventure Game - The Wizard''s Guild Trials'
+
+    DATA(grid1) = page->grid( 'L6 M12 S12' )->content( 'layout' ).
+
+    grid1->simple_form(
+        title =  'abap2UI5 and AXAGE Adventure Game - The Trial'
         editable = abap_true
         )->content( 'form'
             )->label( 'Always Look'
@@ -470,26 +475,34 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
              )->get_parent( )->get_parent( )->get_parent(
             )->button(
                 text  = 'Execute'
-                press = client->_event( 'BUTTON_POST' ) ).
+                press = client->_event( 'BUTTON_POST' )
+
+                 ).
 
     IF image_data IS NOT INITIAL.
-      page->image( src = image_data ).
+
+      grid1->simple_form( 'Location'
+        )->content( 'form'
+        )->vbox( 'sapUiSmallMargin'
+                )->formatted_text( Current_Location
+        )->image( src = image_data ).
+
+      "page->image( src = image_data ).
     ENDIF.
 
-    page->grid( 'L8 M8 S8' )->content( 'layout' ).
-    grid->simple_form( title = 'Game Console - Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
+    "page->grid( 'L8 M8 S8' )->content( 'layout' ).
+    DATA(grid2) = page->grid( 'L6 M8 S8' )->content( 'layout' ).
+
+    grid2->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
         )->code_editor( value = client->_bind( results )
                         editable = 'false'
                         type = `plain_text`
-                        height = '600px'
+                        height = '600px' ).
+
+
+    grid2->simple_form( title = 'Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
          )->vbox( 'sapUiSmallMargin'
                 )->formatted_text( help_html
-
-*        )->text_area( value = client->_bind( help )
-*                      editable = 'false'
-*                      growingmaxlines = '40'
-*                      growing = abap_True
-*                      height = '600px'
        ).
 
 
