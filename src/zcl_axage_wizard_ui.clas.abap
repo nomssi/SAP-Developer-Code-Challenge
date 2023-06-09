@@ -132,8 +132,8 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 "- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
 "- When you **LOOK** at the Fireplace, you find Ashes.
 "- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
-"- When you **LOOK** at the Bookshelf, you find a Magic Tome.
-"- When you **PICKUP** the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
+"- When you **OPEN** the Bookshelf, you find a Magic Tome.
+"- When you **LOOK** at the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
 "- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
 
 
@@ -209,7 +209,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                            needed  = needed_to_open_bookshelf ).
     living_room->add( bookshelf ).
 
-    DATA(painting) = engine->new_object( name = 'PAINTING' state = 'with the title The Guild''s Trial'
+    DATA(painting) = engine->new_object( prefix = `an Old ` name = 'PAINTING' state = 'with the title The Guild''s Trial'
        descr = 'depiction of the Orb of Sunlight, the Potion of Infinite Stars, and the Staff of Eternal Moon'
      can_be_pickup = abap_false
      can_be_drop = abap_false ).
