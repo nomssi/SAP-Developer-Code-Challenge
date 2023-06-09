@@ -51,6 +51,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     METHODS living_room_image RETURNING VALUE(result) TYPE string.
     METHODS garden_image RETURNING VALUE(result) TYPE string.
     METHODS attic_image RETURNING VALUE(result) TYPE string.
+    METHODS create_help_html RETURNING VALUE(result) TYPE string.
 ENDCLASS.
 
 
@@ -58,7 +59,509 @@ ENDCLASS.
 CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
 
-METHOD attic_image.
+  METHOD execute.
+    DATA(result) = engine->interprete( command = command
+                                       auto_look = auto_look ).
+    anzahl_items = lines( engine->player->get_list( ) ).
+
+    last_message = result->last_message( ).
+    strip_type = 'information'.
+
+    IF engine->player->location->exists( 'RFC' ).
+      "AND engine->player->location->name = bill_developer->location->name.
+
+      engine->mission_completed = abap_true.
+      result->add( 'Congratulations! You are now member of the Wizard''s Guild' ).
+    ENDIF.
+
+    results = result->get(  ).
+    current_location = |You are in { engine->player->location->description }|.
+    image_data = engine->player->location->image_data.
+    MESSAGEs = result->t_msg.
+  ENDMETHOD.
+
+  METHOD init_game.
+    DATA(repository) = NEW zcl_axage_repository( ).
+    engine = NEW #( repository ).
+    " Nodes
+    DATA(living_room) = engine->new_room(
+                             name = 'Living Room'
+                             descr = 'the living-room of a wizard''s house.'
+                             image_data = living_room_image( ) ).
+    DATA(attic)  = engine->new_room( name = 'Attic'
+                                       descr = 'the attic.'
+                                       image_data = attic_image( )
+                                       state = 'The attic is dark' ).
+    DATA(garden) = engine->new_room( name = 'Garden'
+                                       descr = 'a beautiful garden.'
+                                       image_data = garden_image(  ) ).
+
+    engine->map->add_room( living_room ).
+    engine->map->add_room( attic ).
+    engine->map->add_room( garden ).
+    engine->map->set_floor_plan( VALUE #(
+      ( `+--------------------+` )
+      ( `| Welding            |` )
+      ( `|  Torch             |` )
+      ( `|                    |` )
+      ( `|       ATTIC        |` )
+      ( `|                    |` )
+      ( `+--------+  +--------+` )
+      ( `         |__| ` )
+      ( `  Ladder |  | ` )
+      ( `+--------+  +--------+ +----------------+` )
+      ( `|              Bucket| | Frog           |` )
+      ( `|mop                 | |                |` )
+      ( `|     LIVING         | |        Well    |` )
+      ( `|      ROOM          +-+                |` )
+      ( `|                    Door    GARDEN     |` )
+      ( `|  Sleeping          +-+                |` )
+      ( `|   Wizard   Whiskey | |         Chain  |` )
+      ( `+--------------------+ +----------------+` )
+       ) ).
+
+    living_room->set_exits(
+      u = attic
+      e = garden ).
+    attic->set_exits(
+      d = living_room ).
+    garden->set_exits(
+      w = living_room ).
+
+**LIVING ROOM**:
+"- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
+"- When you **LOOK** at the Fireplace, you find Ashes.
+"- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
+"- When you **LOOK** at the Bookshelf, you find a Magic Tome.
+"- When you **PICKUP** the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
+"- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
+
+
+    DATA(wizard) = engine->new_object( name = 'WIZARD' state = 'snoring loudly on the couch' descr = ''
+     can_be_pickup = abap_false
+     can_be_drop = abap_false
+     can_be_splash_into = abap_true
+     can_be_dunk_into = abap_false ).
+    living_room->add( wizard ).
+
+    DATA(whiskey) = engine->new_object( name = 'BOTTLE' state = 'on the floor' descr = 'whiskey'  ).
+    living_room->add( whiskey ).
+
+    DATA(bucket) = engine->new_object( name = 'BUCKET' state = 'on the floor' descr = ''
+     can_be_weld = abap_true
+     can_be_splash_into = abap_true
+     can_be_dunk_into = abap_true ).
+    living_room->add( bucket ).
+
+    DATA(mop) = engine->new_object( name = 'MOP' state = 'on the floor' descr = ''
+     can_be_dunk_into = abap_true ).
+    living_room->add( mop ).
+
+    DATA(content_of_fireplace) = engine->new_node( name = 'FirePlaceContent'  ).
+    DATA(ashes) = engine->new_object( name = 'ASHES'
+       descr = 'enchanted ashes'  state = 'from past magical fires'
+       prefix = space ).
+
+    content_of_fireplace->add( ashes ).
+
+    DATA(needed_to_open_fireplace) = engine->new_node( 'FirePlaceOpener' ).
+
+    DATA(fireplace) = NEW zcl_axage_openable_thing(
+      name = 'FIREPLACE'
+      descr = 'carved with arcane symbols'
+      state = 'its grate is filled with ashes'
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      content = content_of_fireplace
+      needed  = needed_to_open_fireplace
+      engine = engine ).
+    living_room->add( fireplace ).
+
+    DATA(bookshelf_key) = engine->new_object( name = 'KEY' descr = 'it is small' ).
+    living_room->add( bookshelf_key ).
+
+    DATA(needed_to_open_tome) = engine->new_node( 'BookOpener' ).
+
+    DATA(content_of_tome) = engine->new_node( 'BookContent' ).
+    content_of_tome->add( engine->new_object( name = 'SPELL'
+       descr = '"Illuminara", which can be used to light up dark places.' ) ).
+    DATA(tome) = NEW zcl_axage_openable_thing(
+      name    = 'TOME'
+      descr   = 'Magic Tome with arcane spells'
+      content = content_of_tome
+      needed  = needed_to_open_tome
+      engine = engine ).
+
+    DATA(content_of_bookshelf) = engine->new_node( 'BookshelfContent' ).
+    content_of_bookshelf->add( tome ).
+
+    DATA(needed_to_open_bookshelf) = engine->new_node( 'BookshelfOpener' ).
+    needed_to_open_bookshelf->add( bookshelf_key ).
+
+    DATA(bookshelf) = NEW zcl_axage_openable_thing( name = 'BOOKSHELF'
+                           descr = 'with magic tomes'
+                           state = 'closed'
+                           engine = engine
+                           can_be_open = abap_true
+                           can_be_pickup = abap_false
+                           can_be_drop = abap_false
+                           content = content_of_bookshelf
+                           needed  = needed_to_open_bookshelf ).
+    living_room->add( bookshelf ).
+
+    DATA(painting) = engine->new_object( name = 'PAINTING' state = 'with the title The Guild''s Trial'
+       descr = 'depiction of the Orb of Sunlight, the Potion of Infinite Stars, and the Staff of Eternal Moon'
+     can_be_pickup = abap_false
+     can_be_drop = abap_false ).
+    living_room->add( painting ).
+
+
+**GARDEN**:
+
+"- When you **LOOK** around, you find a Pond, a Flower Bed, and a Shed.
+"- When you **LOOK** at the Flower Bed, you see a Sunflower.
+"- When you **PICKUP** the Sunflower and **WELD** it with the Ashes from the Fireplace, you obtain the Orb of Sunlight.
+"- When you **LOOK** at the Pond, you notice that it's too dark to see anything.
+"- When you cast "Illuminara" on the Pond, you see a Bottle at the bottom.
+"- When you **PICKUP** the Bottle, you discover it's a Potion of Infinite Stars.
+"- The Shed is locked. The key can be found in the Attic.
+
+    DATA(pond) = engine->new_object( name = 'POND'
+      state = 'it is dark' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      can_be_dunk_into = abap_true
+      can_be_splash_into = abap_true ).
+    garden->add( pond ).
+
+    DATA(flower) = engine->new_object( name = 'FLOWER'
+      state = 'in a flower bed' descr = 'it is a Sunflower'
+      can_be_pickup = abap_false
+      can_be_drop = abap_false ).
+    garden->add( flower ).
+
+    DATA(sched) = engine->new_object( name = 'SCHED'
+      state = 'it is locked' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false ).
+    garden->add( sched ).
+
+    DATA(well) = engine->new_object( name = 'WELL' state = 'in front of you' descr = ''
+      can_be_pickup = abap_false
+      can_be_drop = abap_false
+      can_be_dunk_into = abap_true
+      can_be_splash_into = abap_true ).
+    garden->add( well ).
+
+    DATA(frog) = engine->new_object( name = 'FROG' state = 'on the floor' descr = ''  ).
+    garden->add( frog ).
+
+    DATA(chain) = engine->new_object( name = 'CHAIN' state = ' the floor' descr = ''
+      can_be_weld = abap_true ).
+    garden->add( chain ).
+
+**ATTIC**:
+
+"- The Attic is dark. Use "Illuminara" to light up the space.
+"- When you **LOOK** around, you find a Chest, a Workbench, and a Moon-crested Key.
+"- When you **PICKUP** the Moon-crested Key, you can use this to open the Shed in the Garden.
+"- When you **OPEN** the Chest, you find an old Magic Staff.
+"- When you **PICKUP** the Magic Staff and **DUNK** it into the Potion of Infinite Stars, then **SPLASH** the Orb of Sunlight onto the combined items, you obtain the Staff of Eternal Moon.
+
+    DATA(chest) = engine->new_object( name = 'CHEST' descr = 'on the floor' ).
+    attic->add( chest ).
+
+    DATA(workbench) = engine->new_object( name = 'WORKBENCH'
+      descr = 'on the corner'
+       can_be_pickup = abap_false
+       can_be_drop = abap_false ).
+    attic->add( workbench ).
+
+    DATA(sched_key) = engine->new_object( name = 'BIG KEY' state = 'on the workbench'
+      descr = 'it is moon-crested' ).
+    attic->add( sched_key ).
+
+    DATA(welding_torch) = engine->new_object( name = 'WELDING TORCH'
+      descr = 'in the corner'
+       can_weld = abap_true
+       can_be_pickup = abap_false
+       can_be_drop = abap_false ).
+    attic->add( welding_torch ).
+
+
+    engine->player->set_location( living_room ).
+
+    mt_suggestion = VALUE #(
+        ( descr = 'Display help text'  value = 'HELP' )
+        ( descr = 'Go to the room on the north side'   value = 'NORTH' )
+        ( descr = 'Go to the room on the south side'  value = 'SOUTH' )
+        ( descr = 'Go to the room on the east side'   value = 'EAST' )
+        ( descr = 'Go to the room on the west side'  value = 'WEST' )
+        ( descr = 'Go to the room on the upstairs'    value = 'UP' )
+        ( descr = 'Go to the room on the downstairs'   value = 'DOWN' )
+        ( descr = 'Show Map/floor plan/Game world'  value = 'MAP' )
+
+        ( descr = 'Inventary - Show everything you carry'  value = 'INVENTORY' )
+
+        ( descr = 'What is in the room?' value = 'LOOK' )
+        ( descr = 'Look <object>'       value = 'LOOK' )
+        ( descr = 'Pickup <object>'  value = 'PICKUP' )
+        ( descr = 'Drop <object>'  value = 'DROP' )
+        ( descr = 'Open <object>'  value = 'OPEN' )
+
+        ( descr = 'Ask <person>'  value = 'ASK' )
+        ( descr = 'Cast <spell>'  value = 'CAST' )
+        ( descr = 'Weld <subject> <object>'  value = 'WELD' )
+        ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
+        ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
+         ).
+
+     help_html = create_help_html( ).
+
+
+  ENDMETHOD.
+
+  METHOD z2ui5_if_app~main.
+    IF check_initialized = abap_false.
+      check_initialized = abap_true.
+      command = 'MAP'.
+      init_game( ).
+      help = engine->interprete( 'HELP' )->get( ).
+
+    ENDIF.
+
+    CASE client->get( )-event.
+      WHEN 'LOOK' OR 'INV' OR 'MAP' OR 'UP'
+        OR 'DOWN' OR 'NORTH' OR 'SOUTH' OR 'EAST' OR 'WEST'
+        OR 'HELP'.
+        execute( client->get( )-event ).
+
+      WHEN 'BUTTON_POST'.
+        client->popup_message_toast( |{ command } - send to the server| ).
+        execute( command ).
+
+      WHEN 'BACK'.
+        client->nav_app_leave( client->get_app( client->get( )-id_prev_app_stack  ) ).
+    ENDCASE.
+
+    DATA(view) = z2ui5_cl_xml_view=>factory( )->shell( ).
+    DATA(page) = view->page(
+      id =           'id_page'
+      title          = 'The Wizard''s Adventure Game'
+      navbuttonpress = client->_event( 'BACK' )
+      shownavbutton  = abap_true ).
+
+    page->header_content(
+      )->overflow_toolbar(
+        )->button(
+            text  = 'Look'
+            press = client->_event( 'LOOK' )
+            icon  = 'sap-icon://show'
+            type  = 'Emphasized'
+        )->button(
+             text = 'Map'
+             press = client->_event( 'MAP' )
+             icon  = 'sap-icon://map-2'
+        )->button( text = 'Inventory'
+                   class = 'sapUiTinyMarginBeginEnd'
+                   press = client->_event( 'INV' )
+                   icon = 'sap-icon://menu'  " 'sap-icon://cart'
+             )->get( )->custom_data(
+                        )->badge_custom_data(
+                            key     = 'items'
+                            value   = anzahl_items
+                            visible = abap_true
+        )->get_parent( )->get_parent(
+
+        )->toolbar_spacer(
+
+        )->button(
+             text = 'UP'
+             press = client->_event( 'UP' )
+             icon  = 'sap-icon://arrow-top'
+        )->button(
+             text = 'DOWN'
+             press = client->_event( 'DOWN' )
+             icon  = 'sap-icon://arrow-bottom'
+        )->button(
+             text = 'North'
+             press = client->_event( 'NORTH' )
+             icon  = 'sap-icon://navigation-up-arrow'
+        )->button(
+             text = 'South'
+             press = client->_event( 'SOUTH' )
+             icon  = 'sap-icon://navigation-down-arrow'
+        )->button(
+             text = 'West'
+             press = client->_event( 'WEST' )
+             icon  = 'sap-icon://navigation-left-arrow'
+        )->button(
+             text = 'East'
+             press = client->_event( 'EAST' )
+             icon  = 'sap-icon://navigation-right-arrow'
+
+        )->button(
+             text = 'Help'
+             press = client->_event( 'HELP' )
+             icon  = 'sap-icon://sys-help'
+       )->get_parent( ).
+
+
+    DATA(grid1) = page->grid( 'L6 M12 S12' )->content( 'layout' ).
+
+    grid1->simple_form(
+        title =  'abap2UI5 and AXAGE Adventure Game - The Trial'
+        editable = abap_true
+        )->content( 'form'
+            )->label( 'Always Look'
+              )->switch(
+              state         = client->_bind( auto_look )
+              customtexton  = 'Yes'
+              customtextoff = 'No'
+            )->label( 'Command'
+            )->input(
+                    showClearIcon   = abap_true
+
+                    value           = client->_bind( command )
+                    placeholder     = 'enter your next command'
+                    suggestionitems = client->_bind_one( mt_suggestion )
+                    showsuggestion  = abap_true )->get(
+
+                        )->suggestion_items( )->get(
+                           )->list_item(
+                               text = '{VALUE}'
+                               additionaltext = '{DESCR}'
+             )->get_parent( )->get_parent( )->get_parent(
+            )->button(
+                text  = 'Execute'
+                press = client->_event( 'BUTTON_POST' )
+
+                 ).
+
+    IF image_data IS NOT INITIAL.
+
+      grid1->simple_form( 'Location'
+        )->content( 'form'
+        )->vbox( 'sapUiSmallMargin'
+                )->formatted_text( Current_Location
+        )->image( src = image_data ).
+
+      "page->image( src = image_data ).
+    ENDIF.
+
+    "page->grid( 'L8 M8 S8' )->content( 'layout' ).
+    DATA(grid2) = page->grid( 'L6 M8 S8' )->content( 'layout' ).
+
+    grid2->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
+        )->code_editor( value = client->_bind( results )
+                        editable = 'false'
+                        type = `plain_text`
+                        height = '600px' ).
+
+
+    grid2->simple_form( title = 'Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
+         )->vbox( 'sapUiSmallMargin'
+                )->formatted_text( help_html
+       ).
+
+   page->message_view(
+        items = client->_bind( messages )
+        groupitems = abap_true
+        )->message_item(
+            type        = `{TYPE}`
+            title       = `{TITLE}`
+            subtitle    = `{SUBTITLE}`
+            description = `{DESCRIPTION}`
+            groupname   = `{GROUP}` ).
+
+    page->footer(
+            )->overflow_toolbar(
+        )->button(
+            text  = 'Pickup'
+            press = client->_event( 'PICKUP' )
+            enabled = abap_false
+            icon = 'sap-icon://cart-3'
+        )->button(
+            text  = 'Drop'
+            press = client->_event( 'DROP' )
+            enabled = abap_false
+            icon = 'sap-icon://cart-2'
+        )->button(
+            text  = 'Open'
+            press = client->_event( 'OPEN' )
+            enabled = abap_false
+            icon = 'sap-icon://outbox'
+        )->button(
+            text  = 'Ask'
+            press = client->_event( 'ASK' )
+            enabled = abap_false
+            icon = 'sap-icon://travel-request'
+*        )->button(
+*            text  = 'Weld'
+*            press = client->_event( 'WELD' )
+*            enabled = abap_true
+                )->toolbar_spacer(
+        )->link(
+             text = 'Credits'
+             href  = 'http://landoflisp.com' ).
+    client->set_next( VALUE #( xml_main = page->get_root( )->xml_get( ) ) ).
+  ENDMETHOD.
+
+  METHOD create_help_html.
+     result =
+      `<pre>` &&
+        '              _,._       ' && '<br>' &&
+        '  .||,       /_ _\\\\     ' && '<br>' &&
+        ' \.`'',/      |''L''| |     ' && '<br>' &&
+        ' = ,. =      | -,| L     ' && '<br>' &&
+        ' / || \    ,-''\"/,''`.    ' && '<br>' &&
+        '   ||     ,''   `,,. `.  ' && '<br>' &&
+        '   ,|____,'' , ,;'' \| |   ' && '<br>' &&
+        '  (3|\    _/|/''   _| |   ' && '<br>' &&
+        '   ||/,-''   | >-'' _,\\\\ ' && '<br>' &&
+        '   ||''      ==\ ,-''  ,''  ' && '<br>' &&
+        '   ||       |  V \ ,|    ' && '<br>' &&
+        '   ||       |    |` |    ' && '<br>' &&
+        '   ||       |    |   \   ' && '<br>' &&
+        '   ||       |    \    \  ' && '<br>' &&
+        '   ||       |     |    \ ' && '<br>' &&
+        '   ||       |      \_,-'' ' && '<br>' &&
+        '   ||       |___,,--")_\ ' && '<br>' &&
+        '   ||         |_|   ccc/ ' && '<br>' &&
+        '   ||        ccc/        ' && '<br>' &&
+        '   ||                hjm ' && '<br>' &&
+        `</pre>` &&
+
+      |<h2>Help</h2><p>| &
+      |<h3>Navigation</h3><ul>| &&
+      |<li>MAP        <em>Show map/ floor plan/ world</em>| &&
+      |<li>N or NORTH <em>Walk to the room on the north side</em>| &&
+      |<li>E or EAST  <em>Walk to the room on the east side</em>| &&
+      `<li>S or SOUTH <em>Walk to the room on the south side</em>` &&
+      `<li>W or WEST  <em>Walk to the room on the west side</em>` &&
+      `<li>U or UP    <em>Go to the room upstairs</em>` &&
+      `<li>D or DOWN  <em>Go to the room downstairs</em></ul><p>`.
+
+      help_html = help_html &&
+      |<h3>Interaction</h3>| &&
+      |<ul><li>INV or INVENTORY <em>View everything you are carrying</em>| &&
+      `<li>LOOK <em>Describe your environment</em>` &&
+      `<li>LOOK object     <em>Have a closer look at the object in the room or in your inventory</em>` &&
+      `<li>PICKUP object   (or TAKE) <em>Pickup an object in the current place</em>` &&
+      `<li>DROP object     <em>Drop an object that you carry</em>` &&
+      `<li>OPEN object     <em>Open something that is in the room</em></ul><p>`.
+
+      help_html = help_html &&
+      |<h3>Other</h3><ul>| &&
+      `<li>ASK person            <em>Ask a person to tell you something</em>` &&
+      `<li>CAST spell            <em>Cast a spell you have learned before</em>` &&
+      `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
+      `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
+      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`.
+
+  ENDMETHOD.
+
+  METHOD attic_image.
 result =
 `data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QBaRXhpZgAATU0AKgAAAAgABQMBAAUAAAABAAAASgMDAAEAAAABAAAAAFEQAAEAAAABAQAAAFERAAQAAAABAAAOxFESAAQAAAABAAAOxAAAAAAAAYagAACxj//bAEMAAgEBAgEBAgICAgICAgIDBQMDAwMDBgQEAwUHBgcHBwYHBwgJCwkICAoIBwcKD` &&
 `QoKCwwMDAwHCQ4PDQwOCwwMDP/bAEMBAgICAwMDBgMDBgwIBwgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDP/AABEIAPoA+gMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUM` &&
@@ -138,29 +641,6 @@ result =
 `13wJ+Bnir9pj4vaD4D8EaX/AG34s8T3P2PTLEXMNt9pl2ltvmTOka8KTlmA4619MeMf+CAv7XHgAz/2t8JGs/s6h5P+Ko0WTaD0+7eH17Vm/wDBCb/lLx8BP+xmX/0RLX9Mn7ZHXXP+veH+a18vUzuvHPK2WJLkhg6uIT1vzwkkk3e3K+qtftJH554ocWYzhvJ6OYYGMZTnXp0mpptcslJtq0ou+is728j+Wzxf/wAEqfj54` &&
 `C0q4vdW8AtaWtrsMr/23psmzcwVeFuCTkkdB3rjT+xJ8UP+hXP/AIMbT/47X7h/tff8kr8RfS2/9HRV8f1/Rn0aPD3LvEPhnEZ1nU506lPESpJUnGMeWNKjNNqcZvmvUd3dKyWl7t/ecTVHl2DynEUNXi8HQxE77KdVSclG1rRVtE7tdZM//9k=`.
 ENDMETHOD.
-
-
-  METHOD execute.
-    DATA(result) = engine->interprete( command = command
-                                       auto_look = auto_look ).
-    anzahl_items = lines( engine->player->get_list( ) ).
-
-    last_message = result->last_message( ).
-    strip_type = 'information'.
-
-    IF engine->player->location->exists( 'RFC' ).
-      "AND engine->player->location->name = bill_developer->location->name.
-
-      engine->mission_completed = abap_true.
-      result->add( 'Congratulations! You are now member of the Wizard''s Guild' ).
-    ENDIF.
-
-    results = result->get(  ).
-    current_location = |You are in { engine->player->location->description }|.
-    image_data = engine->player->location->image_data.
-    MESSAGEs = result->t_msg.
-  ENDMETHOD.
-
 
 METHOD garden_image.
 result =
@@ -415,295 +895,7 @@ result =
 ENDMETHOD.
 
 
-  METHOD init_game.
-    DATA(repository) = NEW zcl_axage_repository( ).
-    engine = NEW #( repository ).
-    " Nodes
-    DATA(living_room) = engine->new_room(
-                             name = 'Living Room'
-                             descr = 'the living-room of a wizard''s house.'
-                             image_data = living_room_image( ) ).
-    DATA(attic)  = engine->new_room( name = 'Attic'
-                                       descr = 'the attic.'
-                                       image_data = attic_image( )
-                                       state = 'The attic is dark' ).
-    DATA(garden) = engine->new_room( name = 'Garden'
-                                       descr = 'a beautiful garden.'
-                                       image_data = garden_image(  ) ).
-
-    engine->map->add_room( living_room ).
-    engine->map->add_room( attic ).
-    engine->map->add_room( garden ).
-    engine->map->set_floor_plan( VALUE #(
-      ( `+--------------------+` )
-      ( `| Welding            |` )
-      ( `|  Torch             |` )
-      ( `|                    |` )
-      ( `|       ATTIC        |` )
-      ( `|                    |` )
-      ( `+--------+  +--------+` )
-      ( `         |__| ` )
-      ( `  Ladder |  | ` )
-      ( `+--------+  +--------+ +----------------+` )
-      ( `|              Bucket| | Frog           |` )
-      ( `|mop                 | |                |` )
-      ( `|     LIVING         | |        Well    |` )
-      ( `|      ROOM          +-+                |` )
-      ( `|                    Door    GARDEN     |` )
-      ( `|  Sleeping          +-+                |` )
-      ( `|   Wizard   Whiskey | |         Chain  |` )
-      ( `+--------------------+ +----------------+` )
-       ) ).
-
-    living_room->set_exits(
-      u = attic
-      e = garden ).
-    attic->set_exits(
-      d = living_room ).
-    garden->set_exits(
-      w = living_room ).
-
-**LIVING ROOM**:
-"- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
-"- When you **LOOK** at the Fireplace, you find Ashes.
-"- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
-"- When you **LOOK** at the Bookshelf, you find a Magic Tome.
-"- When you **PICKUP** the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
-"- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
-
-
-    DATA(wizard) = engine->new_object( name = 'WIZARD' state = 'snoring loudly on the couch' descr = ''
-     can_be_pickup = abap_false
-     can_be_drop = abap_false
-     can_be_splash_into = abap_true
-     can_be_dunk_into = abap_false ).
-    living_room->add( wizard ).
-
-    DATA(whiskey) = engine->new_object( name = 'BOTTLE' state = 'on the floor' descr = 'whiskey'  ).
-    living_room->add( whiskey ).
-
-    DATA(bucket) = engine->new_object( name = 'BUCKET' state = 'on the floor' descr = ''
-     can_be_weld = abap_true
-     can_be_splash_into = abap_true
-     can_be_dunk_into = abap_true ).
-    living_room->add( bucket ).
-
-    DATA(mop) = engine->new_object( name = 'MOP' state = 'on the floor' descr = ''
-     can_be_dunk_into = abap_true ).
-    living_room->add( mop ).
-
-    DATA(content_of_fireplace) = engine->new_node( name = 'FirePlaceContent'  ).
-    content_of_fireplace->add( engine->new_object( name = 'ASHES'
-       descr = 'enchanted ashes'  state = 'from past magical fires'  ) ).
-
-    DATA(needed_to_open_fireplace) = engine->new_node( 'FirePlaceOpener' ).
-
-    DATA(fireplace) = NEW zcl_axage_openable_thing(
-      name = 'FIREPLACE'
-      descr = 'carved with arcane symbols'
-      state = 'its grate is filled with ashes'
-      can_be_pickup = abap_false
-      can_be_drop = abap_false
-      content = content_of_fireplace
-      needed  = needed_to_open_fireplace
-      engine = engine ).
-    living_room->add( fireplace ).
-
-    DATA(bookshelf_key) = engine->new_object( name = 'KEY' descr = 'it is small' ).
-    living_room->add( bookshelf_key ).
-
-    DATA(needed_to_open_tome) = engine->new_node( 'BookOpener' ).
-
-    DATA(content_of_tome) = engine->new_node( 'BookContent' ).
-    content_of_tome->add( engine->new_object( name = 'SPELL'
-       descr = '"Illuminara", which can be used to light up dark places.' ) ).
-    DATA(tome) = NEW zcl_axage_openable_thing(
-      name    = 'TOME'
-      descr   = 'Magic Tome with arcane spells'
-      content = content_of_tome
-      needed  = needed_to_open_tome
-      engine = engine ).
-
-    DATA(content_of_bookshelf) = engine->new_node( 'BookshelfContent' ).
-    content_of_bookshelf->add( tome ).
-
-    DATA(needed_to_open_bookshelf) = engine->new_node( 'BookshelfOpener' ).
-    needed_to_open_bookshelf->add( bookshelf_key ).
-
-    DATA(bookshelf) = NEW zcl_axage_openable_thing( name = 'BOOKSHELF'
-                           descr = 'with magic tomes'
-                           state = 'closed'
-                           engine = engine
-                           can_be_open = abap_true
-                           can_be_pickup = abap_false
-                           can_be_drop = abap_false
-                           content = content_of_bookshelf
-                           needed  = needed_to_open_bookshelf ).
-    living_room->add( bookshelf ).
-
-    DATA(painting) = engine->new_object( name = 'PAINTING' state = 'with the title The Guild''s Trial'
-       descr = 'depiction of the Orb of Sunlight, the Potion of Infinite Stars, and the Staff of Eternal Moon'
-     can_be_pickup = abap_false
-     can_be_drop = abap_false ).
-    living_room->add( painting ).
-
-
-**GARDEN**:
-
-"- When you **LOOK** around, you find a Pond, a Flower Bed, and a Shed.
-"- When you **LOOK** at the Flower Bed, you see a Sunflower.
-"- When you **PICKUP** the Sunflower and **WELD** it with the Ashes from the Fireplace, you obtain the Orb of Sunlight.
-"- When you **LOOK** at the Pond, you notice that it's too dark to see anything.
-"- When you cast "Illuminara" on the Pond, you see a Bottle at the bottom.
-"- When you **PICKUP** the Bottle, you discover it's a Potion of Infinite Stars.
-"- The Shed is locked. The key can be found in the Attic.
-
-    DATA(pond) = engine->new_object( name = 'POND'
-      state = 'it is dark' descr = ''
-      can_be_pickup = abap_false
-      can_be_drop = abap_false
-      can_be_dunk_into = abap_true
-      can_be_splash_into = abap_true ).
-    garden->add( pond ).
-
-    DATA(flower) = engine->new_object( name = 'FLOWER'
-      state = 'in a flower bed' descr = 'it is a Sunflower'
-      can_be_pickup = abap_false
-      can_be_drop = abap_false ).
-    garden->add( flower ).
-
-    DATA(sched) = engine->new_object( name = 'SCHED'
-      state = 'it is locked' descr = ''
-      can_be_pickup = abap_false
-      can_be_drop = abap_false ).
-    garden->add( sched ).
-
-    DATA(well) = engine->new_object( name = 'WELL' state = 'in front of you' descr = ''
-      can_be_pickup = abap_false
-      can_be_drop = abap_false
-      can_be_dunk_into = abap_true
-      can_be_splash_into = abap_true ).
-    garden->add( well ).
-
-    DATA(frog) = engine->new_object( name = 'FROG' state = 'on the floor' descr = ''  ).
-    garden->add( frog ).
-
-    DATA(chain) = engine->new_object( name = 'CHAIN' state = ' the floor' descr = ''
-      can_be_weld = abap_true ).
-    garden->add( chain ).
-
-**ATTIC**:
-
-"- The Attic is dark. Use "Illuminara" to light up the space.
-"- When you **LOOK** around, you find a Chest, a Workbench, and a Moon-crested Key.
-"- When you **PICKUP** the Moon-crested Key, you can use this to open the Shed in the Garden.
-"- When you **OPEN** the Chest, you find an old Magic Staff.
-"- When you **PICKUP** the Magic Staff and **DUNK** it into the Potion of Infinite Stars, then **SPLASH** the Orb of Sunlight onto the combined items, you obtain the Staff of Eternal Moon.
-
-    DATA(chest) = engine->new_object( name = 'CHEST' descr = 'on the floor' ).
-    attic->add( chest ).
-
-    DATA(workbench) = engine->new_object( name = 'WORKBENCH'
-      descr = 'on the corner'
-       can_be_pickup = abap_false
-       can_be_drop = abap_false ).
-    attic->add( workbench ).
-
-    DATA(sched_key) = engine->new_object( name = 'BIG KEY' state = 'on the workbench'
-      descr = 'it is moon-crested' ).
-    attic->add( sched_key ).
-
-    DATA(welding_torch) = engine->new_object( name = 'WELDING TORCH'
-      descr = 'in the corner'
-       can_weld = abap_true
-       can_be_pickup = abap_false
-       can_be_drop = abap_false ).
-    attic->add( welding_torch ).
-
-
-    engine->player->set_location( living_room ).
-
-    mt_suggestion = VALUE #(
-        ( descr = 'Display help text'  value = 'HELP' )
-        ( descr = 'Go to the room on the north side'   value = 'NORTH' )
-        ( descr = 'Go to the room on the south side'  value = 'SOUTH' )
-        ( descr = 'Go to the room on the east side'   value = 'EAST' )
-        ( descr = 'Go to the room on the west side'  value = 'WEST' )
-        ( descr = 'Go to the room on the upstairs'    value = 'UP' )
-        ( descr = 'Go to the room on the downstairs'   value = 'DOWN' )
-        ( descr = 'Show Map/floor plan/Game world'  value = 'MAP' )
-
-        ( descr = 'Inventary - Show everything you carry'  value = 'INVENTORY' )
-
-        ( descr = 'What is in the room?' value = 'LOOK' )
-        ( descr = 'Look <object>'       value = 'LOOK' )
-        ( descr = 'Pickup <object>'  value = 'PICKUP' )
-        ( descr = 'Drop <object>'  value = 'DROP' )
-        ( descr = 'Open <object>'  value = 'OPEN' )
-
-        ( descr = 'Ask <person>'  value = 'ASK' )
-        ( descr = 'Cast <spell>'  value = 'CAST' )
-        ( descr = 'Weld <subject> <object>'  value = 'WELD' )
-        ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
-        ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
-         ).
-
-     help_html =
-      `<pre>` &&
-        '              _,._       ' && '<br>' &&
-        '  .||,       /_ _\\\\     ' && '<br>' &&
-        ' \.`'',/      |''L''| |     ' && '<br>' &&
-        ' = ,. =      | -,| L     ' && '<br>' &&
-        ' / || \    ,-''\"/,''`.    ' && '<br>' &&
-        '   ||     ,''   `,,. `.  ' && '<br>' &&
-        '   ,|____,'' , ,;'' \| |   ' && '<br>' &&
-        '  (3|\    _/|/''   _| |   ' && '<br>' &&
-        '   ||/,-''   | >-'' _,\\\\ ' && '<br>' &&
-        '   ||''      ==\ ,-''  ,''  ' && '<br>' &&
-        '   ||       |  V \ ,|    ' && '<br>' &&
-        '   ||       |    |` |    ' && '<br>' &&
-        '   ||       |    |   \   ' && '<br>' &&
-        '   ||       |    \    \  ' && '<br>' &&
-        '   ||       |     |    \ ' && '<br>' &&
-        '   ||       |      \_,-'' ' && '<br>' &&
-        '   ||       |___,,--")_\ ' && '<br>' &&
-        '   ||         |_|   ccc/ ' && '<br>' &&
-        '   ||        ccc/        ' && '<br>' &&
-        '   ||                hjm ' && '<br>' &&
-        `</pre>` &&
-
-      |<h2>Help</h2><p>| &
-      |<h3>Navigation</h3><ul>| &&
-      |<li>MAP        <em>Show map/ floor plan/ world</em>| &&
-      |<li>N or NORTH <em>Walk to the room on the north side</em>| &&
-      |<li>E or EAST  <em>Walk to the room on the east side</em>| &&
-      `<li>S or SOUTH <em>Walk to the room on the south side</em>` &&
-      `<li>W or WEST  <em>Walk to the room on the west side</em>` &&
-      `<li>U or UP    <em>Go to the room upstairs</em>` &&
-      `<li>D or DOWN  <em>Go to the room downstairs</em></ul><p>`.
-
-      help_html = help_html &&
-      |<h3>Interaction</h3>| &&
-      |<ul><li>INV or INVENTORY <em>View everything you are carrying</em>| &&
-      `<li>LOOK <em>Describe your environment</em>` &&
-      `<li>LOOK object     <em>Have a closer look at the object in the room or in your inventory</em>` &&
-      `<li>PICKUP object   (or TAKE) <em>Pickup an object in the current place</em>` &&
-      `<li>DROP object     <em>Drop an object that you carry</em>` &&
-      `<li>OPEN object     <em>Open something that is in the room</em></ul><p>`.
-
-      help_html = help_html &&
-      |<h3>Other</h3><ul>| &&
-      `<li>ASK person            <em>Ask a person to tell you something</em>` &&
-      `<li>CAST spell            <em>Cast a spell you have learned before</em>` &&
-      `<li>WELD subject object   <em>Weld subject to the object if allowed</em>` &&
-      `<li>DUNK subject object   <em>Dunk subject into object if allowed</em>` &&
-      `<li>SPLASH subject object <em>Splash  subject into object</em></ul>`.
-
-
-  ENDMETHOD.
-
-
-  METHOD living_room_image.
+   METHOD living_room_image.
 result =
 `data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/4QBaRXhpZgAATU0AKgAAAAgABQMBAAUAAAABAAAASgMDAAEAAAABAAAAAFEQAAEAAAABAQAAAFERAAQAAAABAAAOxFESAAQAAAABAAAOxAAAAAAAAYagAACxj//bAEMAAgEBAgEBAgICAgICAgIDBQMDAwMDBgQEAwUHBgcHBwYHBwgJCwkICAoIBwcKD` &&
 `QoKCwwMDAwHCQ4PDQwOCwwMDP/bAEMBAgICAwMDBgMDBgwIBwgMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDP/AABEIAPoA+gMBIgACEQEDEQH/xAAfAAABBQEBAQEBAQAAAAAAAAAAAQIDBAUGBwgJCgv/xAC1EAACAQMDAgQDBQUEBAAAAX0BAgMABBEFEiExQQYTUWEHInEUM` &&
@@ -875,191 +1067,4 @@ result =
 `g/Fv/BHX9pjwF539sfC24sjbKHkz4h0eTaD0+5dn17Vkf8ABFs/8bMvgj/2M7f+iJq/fr9sjrrn/XvD/NarDVfrGe4rL5r3KeFrV01vzwaST6cr6q1+0kfjvi54hZjwlk+Gx2XQhOVStTptVFJrlkpNtcsou/uq2rW+h/O94t/YV+LXgTTLi91bwdNY2tqFM0h1Sxk2biFXhJ2PJYDgGuS/4UT4r/6BLf8AgVD/APF1+pn7X` &&
 `3/JK/EX0tv/AEdFXx/X9M/Rp8GMk8ROGcRnWdVatOpTxEqSVKUIx5Y0qM02pwqPmvUabTSslpe7f1vE3EmKy7B5TiaEYt4vB0MRO6dlOqpOSjZq0FZWTcn3kz//2Q==`.
 ENDMETHOD.
-
-
-  METHOD z2ui5_if_app~main.
-    IF check_initialized = abap_false.
-      check_initialized = abap_true.
-      command = 'MAP'.
-      init_game( ).
-      help = engine->interprete( 'HELP' )->get( ).
-
-    ENDIF.
-
-    CASE client->get( )-event.
-      WHEN 'LOOK' OR 'INV' OR 'MAP' OR 'UP'
-        OR 'DOWN' OR 'NORTH' OR 'SOUTH' OR 'EAST' OR 'WEST'
-        OR 'HELP'.
-        execute( client->get( )-event ).
-
-      WHEN 'BUTTON_POST'.
-        client->popup_message_toast( |{ command } - send to the server| ).
-        execute( command ).
-
-      WHEN 'BACK'.
-        client->nav_app_leave( client->get_app( client->get( )-id_prev_app_stack  ) ).
-    ENDCASE.
-
-    DATA(view) = z2ui5_cl_xml_view=>factory( )->shell( ).
-    DATA(page) = view->page(
-      id =           'id_page'
-      title          = 'The Wizard''s Adventure Game'
-      navbuttonpress = client->_event( 'BACK' )
-      shownavbutton  = abap_true ).
-
-    page->header_content(
-      )->overflow_toolbar(
-        )->button(
-            text  = 'Look'
-            press = client->_event( 'LOOK' )
-            icon  = 'sap-icon://show'
-            type  = 'Emphasized'
-        )->button(
-             text = 'Map'
-             press = client->_event( 'MAP' )
-             icon  = 'sap-icon://map-2'
-        )->button( text = 'Inventory'
-                   class = 'sapUiTinyMarginBeginEnd'
-                   press = client->_event( 'INV' )
-                   icon = 'sap-icon://menu'  " 'sap-icon://cart'
-             )->get( )->custom_data(
-                        )->badge_custom_data(
-                            key     = 'items'
-                            value   = anzahl_items
-                            visible = abap_true
-        )->get_parent( )->get_parent(
-
-        )->toolbar_spacer(
-
-        )->button(
-             text = 'UP'
-             press = client->_event( 'UP' )
-             icon  = 'sap-icon://arrow-top'
-        )->button(
-             text = 'DOWN'
-             press = client->_event( 'DOWN' )
-             icon  = 'sap-icon://arrow-bottom'
-        )->button(
-             text = 'North'
-             press = client->_event( 'NORTH' )
-             icon  = 'sap-icon://navigation-up-arrow'
-        )->button(
-             text = 'South'
-             press = client->_event( 'SOUTH' )
-             icon  = 'sap-icon://navigation-down-arrow'
-        )->button(
-             text = 'West'
-             press = client->_event( 'WEST' )
-             icon  = 'sap-icon://navigation-left-arrow'
-        )->button(
-             text = 'East'
-             press = client->_event( 'EAST' )
-             icon  = 'sap-icon://navigation-right-arrow'
-
-        )->button(
-             text = 'Help'
-             press = client->_event( 'HELP' )
-             icon  = 'sap-icon://sys-help'
-       )->get_parent( ).
-
-
-    DATA(grid1) = page->grid( 'L6 M12 S12' )->content( 'layout' ).
-
-    grid1->simple_form(
-        title =  'abap2UI5 and AXAGE Adventure Game - The Trial'
-        editable = abap_true
-        )->content( 'form'
-            )->label( 'Always Look'
-              )->switch(
-              state         = client->_bind( auto_look )
-              customtexton  = 'Yes'
-              customtextoff = 'No'
-            )->label( 'Command'
-            )->input(
-                    showClearIcon   = abap_true
-
-                    value           = client->_bind( command )
-                    placeholder     = 'enter your next command'
-                    suggestionitems = client->_bind_one( mt_suggestion )
-                    showsuggestion  = abap_true )->get(
-
-                        )->suggestion_items( )->get(
-                           )->list_item(
-                               text = '{VALUE}'
-                               additionaltext = '{DESCR}'
-             )->get_parent( )->get_parent( )->get_parent(
-            )->button(
-                text  = 'Execute'
-                press = client->_event( 'BUTTON_POST' )
-
-                 ).
-
-    IF image_data IS NOT INITIAL.
-
-      grid1->simple_form( 'Location'
-        )->content( 'form'
-        )->vbox( 'sapUiSmallMargin'
-                )->formatted_text( Current_Location
-        )->image( src = image_data ).
-
-      "page->image( src = image_data ).
-    ENDIF.
-
-    "page->grid( 'L8 M8 S8' )->content( 'layout' ).
-    DATA(grid2) = page->grid( 'L6 M8 S8' )->content( 'layout' ).
-
-    grid2->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
-        )->code_editor( value = client->_bind( results )
-                        editable = 'false'
-                        type = `plain_text`
-                        height = '600px' ).
-
-
-    grid2->simple_form( title = 'Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
-         )->vbox( 'sapUiSmallMargin'
-                )->formatted_text( help_html
-       ).
-
-   page->message_view(
-        items = client->_bind( messages )
-        groupitems = abap_true
-        )->message_item(
-            type        = `{TYPE}`
-            title       = `{TITLE}`
-            subtitle    = `{SUBTITLE}`
-            description = `{DESCRIPTION}`
-            groupname   = `{GROUP}` ).
-
-    page->footer(
-            )->overflow_toolbar(
-        )->button(
-            text  = 'Pickup'
-            press = client->_event( 'PICKUP' )
-            enabled = abap_false
-            icon = 'sap-icon://cart-3'
-        )->button(
-            text  = 'Drop'
-            press = client->_event( 'DROP' )
-            enabled = abap_false
-            icon = 'sap-icon://cart-2'
-        )->button(
-            text  = 'Open'
-            press = client->_event( 'OPEN' )
-            enabled = abap_false
-            icon = 'sap-icon://outbox'
-        )->button(
-            text  = 'Ask'
-            press = client->_event( 'ASK' )
-            enabled = abap_false
-            icon = 'sap-icon://travel-request'
-*        )->button(
-*            text  = 'Weld'
-*            press = client->_event( 'WELD' )
-*            enabled = abap_true
-                )->toolbar_spacer(
-        )->link(
-             text = 'Credits'
-             href  = 'http://landoflisp.com' ).
-    client->set_next( VALUE #( xml_main = page->get_root( )->xml_get( ) ) ).
-  ENDMETHOD.
 ENDCLASS.
