@@ -12,6 +12,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA results          TYPE string.
     DATA help             TYPE string.
     DATA help_html        TYPE string.
+    DATA player_name     TYPE string VALUE 'Player1'.
 
     DATA current_location TYPE string.
     DATA image_data       TYPE string.
@@ -39,10 +40,16 @@ CLASS zcl_axage_wizard_ui DEFINITION
 
     DATA messages     TYPE zcl_axage_result=>tt_msg.
 
+    METHODS view_popup_input
+      IMPORTING client TYPE REF TO z2ui5_if_client.
+
   PROTECTED SECTION.
   PRIVATE SECTION.
     DATA engine TYPE REF TO zcl_axage_engine.
     DATA check_initialized TYPE abap_bool.
+    DATA mv_popup_name TYPE string.
+    DATA mv_main_xml TYPE string.
+    DATA mv_popup_xml TYPE string.
     METHODS init_game.
     METHODS execute IMPORTING command TYPE string.
 
@@ -118,7 +125,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                                    descr = 'the Guild''s decret.'
                                    image_data = lcl_image_library=>congratulation( ) ).
       engine->player->location = guild.
-      result->add( 'Congratulations! You are now member of the Wizard''s Guild' ).
       result->success_msg( title = 'Mission completed'
                            subtitle = 'You did it!'
                            description = |Congratulations, you are now a member of the Wizard's Guild.| ).
@@ -213,13 +219,11 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                                      ( |Now leave me alone...\n| )  )
                                       ).
     wizard->add_inactive_sentences( VALUE #(
-                                     ( |Thanks for the whisky, but that is not enough...| )
                                      ( |Combine three magical items to open a portal to the Wizard's Guild.| )
-                                     ( |Find the Potion of Infinite Stars and| )
+                                     ( |Find the Potion of Infinite Stars| )
                                      ( |Create the Orb of Sunlight and | )
                                      ( |the Staff of Eternal Moon. \n| )
-                                     ( |Now go and let me sleep...\n| )  )
-                                      ).
+                                     ( |Check the magic tome and let me sleep...\n| ) )     ).
     living_room->add( wizard ).
 
     DATA(whiskey) = engine->new_object( name = 'BOTTLE' state = 'on the floor' descr = 'whiskey'  ).
@@ -262,7 +266,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     DATA(content_of_tome) = engine->new_node( 'BookContent' ).
     content_of_tome->add( engine->new_spell( name = 'LUMI' prefix = ''
-       descr = '"Illuminara", which can light up dark places.' ) ).
+       descr = '"Illuminara", a spell which can light up dark places.' ) ).
     DATA(tome) = NEW zcl_axage_openable_thing(
       name    = 'TOME'
       descr   = 'Magic Tome with arcane spells'
@@ -310,10 +314,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     content_of_chest->add( magic_staff ).
 
     DATA(needed_to_open_chest) = engine->new_node( 'ChestOpener' ).
-    needed_to_open_chest->add( bookshelf_key ).
+    "needed_to_open_chest->add( ).
 
     DATA(chest) = NEW zcl_axage_openable_thing( name = 'CHEST'
-                           descr = 'with magic tomes'
+                           descr = 'large'
                            state = 'closed'
                            repository = engine->repository
                            can_be_open = abap_true
@@ -438,6 +442,32 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
   ENDMETHOD.
 
 
+  METHOD view_popup_input.
+
+    DATA(popup) = Z2UI5_CL_XML_VIEW=>factory_popup(
+       )->dialog(
+       "contentheight = '200px'
+       contentwidth  = '500px'
+       title = 'Setup Player'
+       )->content(
+           )->simple_form(
+               )->label( 'Guild Aspirant''s Name'
+               )->input( client->_bind( player_name )
+       )->get_parent( )->get_parent(
+       )->footer( )->overflow_toolbar(
+           )->toolbar_spacer(
+           )->button(
+               text  = 'Cancel'
+               press = client->_event( 'BUTTON_PLAYER_CANCEL' )
+           )->button(
+               text  = 'Confirm'
+               press = client->_event( 'BUTTON_PLAYER_CONFIRM' )
+               type  = 'Emphasized' ).
+
+    mv_popup_xml = popup->get_root( )->xml_get( ).
+
+  ENDMETHOD.
+
   METHOD z2ui5_if_app~main.
     IF check_initialized = abap_false.
       check_initialized = abap_true.
@@ -446,6 +476,8 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       help = engine->interprete( 'HELP' )->get( ).
 
     ENDIF.
+
+    mv_popup_name = ''.
 
     CASE client->get( )-event.
       WHEN 'LOOK' OR 'INV' OR 'MAP' OR 'UP'
@@ -456,6 +488,16 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       WHEN 'BUTTON_POST'.
         client->popup_message_toast( |{ command } - send to the server| ).
         execute( command ).
+
+     WHEN 'POPUP_SETUP_PLAYER'.
+        player_name = engine->player->name.
+        mv_popup_name =  'POPUP_TO_INPUT_PLAYER'.
+
+     WHEN 'BUTTON_PLAYER_CONFIRM'.
+        engine->player->name = player_name.
+
+      WHEN 'BUTTON_PLAYER_CANCEL'.
+        client->popup_message_toast( 'player cancel pressed' ).
 
       WHEN 'BACK'.
         client->nav_app_leave( client->get_app( client->get( )-id_prev_app_stack  ) ).
@@ -537,7 +579,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
             )->label( 'Command'
             )->input(
                     showClearIcon   = abap_true
-
+                   " submit          = client->_event( `BUTTON_POST` )
                     value           = client->_bind( command )
                     placeholder     = 'enter your next command'
                     suggestionitems = client->_bind_one( mt_suggestion )
@@ -549,14 +591,15 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                                additionaltext = '{DESCR}'
 
              )->get_parent( )->get_parent(
-               )->hbox( justifycontent = `SpaceBetween` )->button(
-                   text = `Execute` press = client->_event( `BUTTON_POST` )
-                   type = `Emphasized`
+               )->hbox( justifycontent = `SpaceBetween`
+                  )->button(
+                     text = `Go` press = client->_event( `BUTTON_POST` )
+                     type = `Emphasized`
                  ).
 
     IF image_data IS NOT INITIAL.
 
-      grid1->simple_form( 'Location'
+      grid1->simple_form( |Location of { engine->player->name }|
         )->content( 'form'
         )->vbox( 'sapUiSmallMargin'
                 )->formatted_text( Current_Location
@@ -617,10 +660,36 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 *            press = client->_event( 'WELD' )
 *            enabled = abap_true
                 )->toolbar_spacer(
+        )->button(
+           text  = 'Player'
+           icon  = 'sap-icon://account'
+           press = client->_event( 'POPUP_SETUP_PLAYER' )
         )->link(
              text = 'Credits'
+             href  = 'https://github.com/Ennowulff/axage'
+        )->link(
+             text = 'abap2UI5'
+             href  = 'https://github.com/oblomov-dev/abap2ui5'
+        )->link(
+             text = 'AXAGE+UI5'
+             href  = 'https://github.com/jung-thomas/axage_example'
+        )->link(
+             text = 'Land Of Lisp'
              href  = 'http://landoflisp.com' ).
-    client->set_next( VALUE #( xml_main = page->get_root( )->xml_get( ) ) ).
+
+    mv_main_xml = page->get_root( )->xml_get( ).
+
+   CASE mv_popup_name.
+
+      WHEN 'POPUP_TO_INPUT_PLAYER'.
+        view_popup_input( client ).
+
+    ENDCASE.
+
+    client->set_next( VALUE #( xml_main = mv_main_xml
+                               xml_popup = mv_popup_xml ) ).
+    CLEAR: mv_main_xml, mv_popup_xml.
+
   ENDMETHOD.
 
 ENDCLASS.
