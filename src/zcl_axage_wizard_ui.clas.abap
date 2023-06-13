@@ -12,7 +12,7 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA results          TYPE string.
     DATA help             TYPE string.
     DATA help_html        TYPE string.
-    DATA player_name     TYPE string VALUE 'Player1'.
+    DATA player_name      TYPE string VALUE 'Player1'.
 
     DATA current_location TYPE string.
     DATA image_data       TYPE string.
@@ -45,14 +45,21 @@ CLASS zcl_axage_wizard_ui DEFINITION
 
   PROTECTED SECTION.
   PRIVATE SECTION.
-    DATA engine TYPE REF TO zcl_axage_engine.
-    DATA check_initialized TYPE abap_bool.
+    DATA:
+      BEGIN OF app,
+        client            TYPE REF TO z2ui5_if_client,
+        check_initialized TYPE abap_bool,
+        view_main         TYPE string,
+        view_popup        TYPE string,
+        s_get             TYPE z2ui5_if_client=>ty_s_get,
+        s_next            TYPE z2ui5_if_client=>ty_s_next,
+      END OF app.
+
     DATA mv_popup_name TYPE string.
-    DATA mv_main_xml TYPE string.
-    DATA mv_popup_xml TYPE string.
+    DATA engine TYPE REF TO zcl_axage_engine.
+
     METHODS init_game.
     METHODS execute IMPORTING command TYPE string.
-
     METHODS create_help_html RETURNING VALUE(result) TYPE string.
 ENDCLASS.
 
@@ -137,7 +144,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     messages = result->t_msg.
   ENDMETHOD.
 
-
   METHOD init_game.
     DATA(repository) = NEW zcl_axage_repository( ).
     engine = NEW #( repository ).
@@ -187,8 +193,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       ( `                       |Frog            |` )
       ( `                       |     POND       |` )
       ( `                       |         Potion |` )
-      ( `                       +----------------+` )
-       ) ).
+      ( `                       +----------------+` ) ) ).
 
     living_room->set_exits(
       u = attic
@@ -203,21 +208,19 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     engine->player->set_location( living_room ).
 
-**LIVING ROOM**:
-"- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
-"- When you **LOOK** at the Fireplace, you find Ashes.
-"- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
-"- When you **OPEN** the Bookshelf, you find a Magic Tome.
-"- When you **LOOK** at the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
-"- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
-
+    " LIVING ROOM**:
+    "- When you **LOOK** around, you find a Fireplace, a Bookshelf, and an Old Painting.
+    "- When you **LOOK** at the Fireplace, you find Ashes.
+    "- When you **PICKUP** the Ashes, you obtain them in your **INVENTORY**.
+    "- When you **OPEN** the Bookshelf, you find a Magic Tome.
+    "- When you **LOOK** at the Magic Tome, you learn the spell "Illuminara", which can be used to light up dark places.
+    "- When you **LOOK** at the Old Painting, you find a depiction of the three magical items you're searching for.
 
     DATA(wizard) = engine->new_actor( name = 'WIZARD' state = 'snoring loudly on the couch' descr = ''
                                       active = abap_false
                                       location = living_room ).
     wizard->add_sentences( VALUE #(  ( |Go and weld a Sunflower with the Ashes from the Fireplace| )
-                                     ( |Now leave me alone...\n| )  )
-                                      ).
+                                     ( |Now leave me alone...\n| )  ) ).
     wizard->add_inactive_sentences( VALUE #(
                                      ( |Combine three magical items to open a portal to the Wizard's Guild.| )
                                      ( |Find the Potion of Infinite Stars| )
@@ -297,15 +300,13 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
      can_be_drop = abap_false ).
     living_room->add( painting ).
 
+    " ATTIC**:
 
-**ATTIC**:
-
-"- The Attic is dark. Use "Illuminara" to light up the space.
-"- When you **LOOK** around, you find a Chest, a Workbench, and a Moon-crested Key.
-"- When you **PICKUP** the Moon-crested Key, you can use this to open the Shed in the Garden.
-"- When you **OPEN** the Chest, you find an old Magic Staff.
-"- When you **PICKUP** the Magic Staff and **DUNK** it into the Potion of Infinite Stars, then **SPLASH** the Orb of Sunlight onto the combined items, you obtain the Staff of Eternal Moon.
-
+    "- The Attic is dark. Use "Illuminara" to light up the space.
+    "- When you **LOOK** around, you find a Chest, a Workbench, and a Moon-crested Key.
+    "- When you **PICKUP** the Moon-crested Key, you can use this to open the Shed in the Garden.
+    "- When you **OPEN** the Chest, you find an old Magic Staff.
+    "- When you **PICKUP** the Magic Staff and **DUNK** it into the Potion of Infinite Stars, then **SPLASH** the Orb of Sunlight onto the combined items, you obtain the Staff of Eternal Moon.
 
     DATA(magic_Staff) = engine->new_object( name = 'STAFF'
        descr = 'an old Magic Staff'  state = '' ).
@@ -314,7 +315,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     content_of_chest->add( magic_staff ).
 
     DATA(needed_to_open_chest) = engine->new_node( 'ChestOpener' ).
-    "needed_to_open_chest->add( ).
+    " needed_to_open_chest->add( ).
 
     DATA(chest) = NEW zcl_axage_openable_thing( name = 'CHEST'
                            descr = 'large'
@@ -344,12 +345,12 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
        can_be_drop = abap_false ).
     attic->add( welding_torch ).
 
-**GARDEN**:
+    " GARDEN**:
 
-"- When you **LOOK** around, you find a Pond, a Flower Bed, and a Shed.
-"- When you **LOOK** at the Flower Bed, you see a Sunflower.
-"- When you **PICKUP** the Sunflower and **WELD** it with the Ashes from the Fireplace, you obtain the Orb of Sunlight.
-"- The Shed is locked. The key can be found in the Attic.
+    "- When you **LOOK** around, you find a Pond, a Flower Bed, and a Shed.
+    "- When you **LOOK** at the Flower Bed, you see a Sunflower.
+    "- When you **PICKUP** the Sunflower and **WELD** it with the Ashes from the Fireplace, you obtain the Orb of Sunlight.
+    "- The Shed is locked. The key can be found in the Attic.
 
     DATA(content_of_flowerbed) = engine->new_node( name = 'FlowerbedContent'  ).
     DATA(sunflower) = engine->new_object( name = 'SUNFLOWER'
@@ -397,11 +398,11 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       can_be_weld = abap_true ).
     garden->add( chain ).
 
-**POND**:
+    " POND**:
 
-"- When you **LOOK** at the Pond, you notice that it's too dark to see anything.
-"- When you cast "Illuminara" on the Pond, you see a Bottle at the bottom.
-"- When you **PICKUP** the Bottle, you discover it's a Potion of Infinite Stars.
+    "- When you **LOOK** at the Pond, you notice that it's too dark to see anything.
+    "- When you cast "Illuminara" on the Pond, you see a Bottle at the bottom.
+    "- When you **PICKUP** the Bottle, you discover it's a Potion of Infinite Stars.
 
     DATA(potion) = engine->new_object( name = 'POTION' state = 'at the bottom'
                                        descr = 'of Infinite Stars'  ).
@@ -409,7 +410,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     DATA(frog) = engine->new_object( name = 'FROG' state = '' descr = ''  ).
     pond->add( frog ).
-
 
     mt_suggestion = VALUE #(
         ( descr = 'Display help text'  value = 'HELP' )
@@ -433,12 +433,9 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
         ( descr = 'Cast <spell>'  value = 'CAST' )
         ( descr = 'Weld <subject> <object>'  value = 'WELD' )
         ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
-        ( descr = 'Splash <subject> <object>'  value = 'SPLASH' )
-         ).
+        ( descr = 'Splash <subject> <object>'  value = 'SPLASH' ) ).
 
-     help_html = create_help_html( ).
-
-
+    help_html = create_help_html( ).
   ENDMETHOD.
 
 
@@ -464,13 +461,16 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                press = client->_event( 'BUTTON_PLAYER_CONFIRM' )
                type  = 'Emphasized' ).
 
-    mv_popup_xml = popup->get_root( )->xml_get( ).
+    app-s_next-xml_popup = popup->get_root( )->xml_get( ).
 
   ENDMETHOD.
 
   METHOD z2ui5_if_app~main.
-    IF check_initialized = abap_false.
-      check_initialized = abap_true.
+    app-client = client.
+    app-s_get = client->get( ).
+
+    IF app-check_initialized = abap_false.
+      app-check_initialized = abap_true.
       command = 'MAP'.
       init_game( ).
       help = engine->interprete( 'HELP' )->get( ).
@@ -488,16 +488,17 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       WHEN 'BUTTON_POST'.
         client->popup_message_toast( |{ command } - send to the server| ).
         execute( command ).
+        app-s_next-s_cursor  = VALUE #( id = 'id_command' cursorpos = '1' selectionstart = '1' selectionend = '1' ).
 
-     WHEN 'POPUP_SETUP_PLAYER'.
+      WHEN 'POPUP_SETUP_PLAYER'.
         player_name = engine->player->name.
-        mv_popup_name =  'POPUP_TO_INPUT_PLAYER'.
+        mv_popup_name = 'POPUP_TO_INPUT_PLAYER'.
 
-     WHEN 'BUTTON_PLAYER_CONFIRM'.
+      WHEN 'BUTTON_PLAYER_CONFIRM'.
         engine->player->name = player_name.
 
       WHEN 'BUTTON_PLAYER_CANCEL'.
-        client->popup_message_toast( 'player cancel pressed' ).
+        client->popup_message_toast( 'Player Setup - Cancel pressed' ).
 
       WHEN 'BACK'.
         client->nav_app_leave( client->get_app( client->get( )-id_prev_app_stack  ) ).
@@ -523,7 +524,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
         )->button( text = 'Inventory'
                    class = 'sapUiTinyMarginBeginEnd'
                    press = client->_event( 'INV' )
-                   icon = 'sap-icon://menu'  " 'sap-icon://cart'
+                   icon = 'sap-icon://menu'
              )->get( )->custom_data(
                         )->badge_custom_data(
                             key     = 'items'
@@ -564,7 +565,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
              icon  = 'sap-icon://sys-help'
        )->get_parent( ).
 
-
     DATA(grid1) = page->grid( 'L6 M12 S12' )->content( 'layout' ).
 
     grid1->simple_form(
@@ -578,8 +578,9 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
               customtextoff = 'No'
             )->label( 'Command'
             )->input(
+                    id              = 'id_command'
                     showClearIcon   = abap_true
-                   " submit          = client->_event( `BUTTON_POST` )
+                    submit          = client->_event( `BUTTON_POST` )
                     value           = client->_bind( command )
                     placeholder     = 'enter your next command'
                     suggestionitems = client->_bind_one( mt_suggestion )
@@ -594,8 +595,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                )->hbox( justifycontent = `SpaceBetween`
                   )->button(
                      text = `Go` press = client->_event( `BUTTON_POST` )
-                     type = `Emphasized`
-                 ).
+                     type = `Emphasized` ).
 
     IF image_data IS NOT INITIAL.
 
@@ -605,10 +605,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                 )->formatted_text( Current_Location
         )->image( src = image_data ).
 
-      "page->image( src = image_data ).
+      " page->image( src = image_data ).
     ENDIF.
 
-    "page->grid( 'L8 M8 S8' )->content( 'layout' ).
+    " page->grid( 'L8 M8 S8' )->content( 'layout' ).
     DATA(grid2) = page->grid( 'L6 M8 S8' )->content( 'layout' ).
 
     grid2->simple_form( title = 'Game Console' editable = abap_true )->content( 'form'
@@ -617,21 +617,19 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                         type = `plain_text`
                         height = '600px' ).
 
-
     grid2->simple_form( title = 'Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
          )->vbox( 'sapUiSmallMargin'
-                )->formatted_text( help_html
-       ).
+                )->formatted_text( help_html ).
 
-   page->message_view(
-        items = client->_bind( messages )
-        groupitems = abap_true
-        )->message_item(
-            type        = `{TYPE}`
-            title       = `{TITLE}`
-            subtitle    = `{SUBTITLE}`
-            description = `{DESCRIPTION}`
-            groupname   = `{GROUP}` ).
+    page->message_view(
+         items = client->_bind( messages )
+         groupitems = abap_true
+         )->message_item(
+             type        = `{TYPE}`
+             title       = `{TITLE}`
+             subtitle    = `{SUBTITLE}`
+             description = `{DESCRIPTION}`
+             groupname   = `{GROUP}` ).
 
     page->footer(
             )->overflow_toolbar(
@@ -677,19 +675,18 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
              text = 'Land Of Lisp'
              href  = 'http://landoflisp.com' ).
 
-    mv_main_xml = page->get_root( )->xml_get( ).
+    app-s_next-xml_main = page->get_root( )->xml_get( ).
 
-   CASE mv_popup_name.
+    CASE mv_popup_name.
 
       WHEN 'POPUP_TO_INPUT_PLAYER'.
         view_popup_input( client ).
 
     ENDCASE.
 
-    client->set_next( VALUE #( xml_main = mv_main_xml
-                               xml_popup = mv_popup_xml ) ).
-    CLEAR: mv_main_xml, mv_popup_xml.
-
+    client->set_next( app-s_next ).
+    app-view_popup = ``.
+    CLEAR app-s_next.
   ENDMETHOD.
 
 ENDCLASS.
