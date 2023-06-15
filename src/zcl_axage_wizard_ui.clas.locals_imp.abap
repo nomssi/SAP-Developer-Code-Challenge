@@ -2,9 +2,11 @@
 *"* local helper classes, interface definitions and type
 *"* declarations
 
-CLASS lcl_image_library DEFINITION.
+CLASS lcl_library DEFINITION.
   PUBLIC SECTION.
     CLASS-METHODS:
+      intro RETURNING VALUE(result) TYPE string,
+
       attic RETURNING VALUE(result) TYPE string,
       garden RETURNING VALUE(result) TYPE string,
       congratulation RETURNING VALUE(result) TYPE string,
@@ -14,7 +16,25 @@ CLASS lcl_image_library DEFINITION.
 
 ENDCLASS.
 
-CLASS lcl_image_library IMPLEMENTATION.
+CLASS lcl_library IMPLEMENTATION.
+
+  METHOD intro.
+    result =
+ |\n| &&
+ |Esteemed Wizard Apprentice,\n| &&
+ |\n| &&
+ |Congratulations on your journey to mastery of the arcane arts. You must prove your | &&
+ |worthiness by obtaining three magical items: the Orb of Sunlight, the Potion of Infinite Stars, | &&
+ |and the Staff of Eternal Moon. These items will unlock the portal to the Wizard's Guild, where | &&
+ |you will become a full-fledged wizard.\n| &&
+ |\n| &&
+ |Embark on your adventure, seek wisdom, solve puzzles, and overcome obstacles. Combine | &&
+ |the items in the correct order, and open the portal to the Wizard's Guild.\n| &&
+ |\n| &&
+ |May Eldoria guide you. Prove your worth and unlock the secrets of the Wizard's Guild.\n| &&
+ |\n| &&
+ |Yours in magic\n| .
+  ENDMETHOD.
 
   METHOD congratulation.
 result = `data:image/gif;base64,R0lGODdh+gD6AOf2ABgSNBwVLhgXKR8XKicfNCMhMSogLigjKxQrUDEtMy4vPkAtKkIwHTgzMJIXNgw+VZ0VMYsaPR87Sjo3PHMsFGE1F4AlcXwrQgJNc0M+Oks7Sw1OZUZBNXgrh2I6NIctVJEqWXA2TitLWmQ7UZIrZmBCFV1CI1I6tlpEMDFMbydF909LIUpKQABcfA5eMSlG7kBMWwdccy` &&

@@ -11,8 +11,8 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA anzahl_items     TYPE string     VALUE '0'.
     DATA results          TYPE string.
     DATA help             TYPE string.
-    DATA help_html        TYPE string.
-    DATA player_name      TYPE string VALUE 'Player1'.
+    DATA formatted_text   TYPE string.
+    DATA player_name      TYPE string.
 
     DATA current_location TYPE string.
     DATA image_data       TYPE string.
@@ -38,13 +38,14 @@ CLASS zcl_axage_wizard_ui DEFINITION
     DATA mt_file      TYPE STANDARD TABLE OF ty_file WITH EMPTY KEY.
     DATA ms_file_prev TYPE ty_file.
 
-    DATA messages     TYPE zcl_axage_result=>tt_msg.
+    DATA messages     TYPE ycl_axage_log=>tt_msg.
 
     METHODS view_popup_input
       IMPORTING client TYPE REF TO z2ui5_if_client.
 
   PROTECTED SECTION.
   PRIVATE SECTION.
+    CONSTANTS c_id_command TYPE string VALUE 'id_command'.
     DATA:
       BEGIN OF app,
         client            TYPE REF TO z2ui5_if_client,
@@ -56,11 +57,12 @@ CLASS zcl_axage_wizard_ui DEFINITION
       END OF app.
 
     DATA mv_popup_name TYPE string.
-    DATA engine TYPE REF TO zcl_axage_engine.
+    DATA engine TYPE REF TO ycl_axage_engine.
 
     METHODS init_game.
     METHODS execute IMPORTING command TYPE string.
     METHODS create_help_html RETURNING VALUE(result) TYPE string.
+    METHODS set_focus.
 ENDCLASS.
 
 
@@ -122,49 +124,49 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
   ENDMETHOD.
 
   METHOD execute.
-    DATA(result) = engine->interprete( command = command
-                                       auto_look = auto_look ).
-    anzahl_items = lines( engine->player->get_list( ) ).
+    DATA(log) = engine->interprete( command = command
+                                    auto_look = auto_look ).
 
     IF engine->mission_completed = abap_true.
 
       DATA(guild) = engine->new_room( name = 'Wizard''s Guild'
-                                   descr = 'the Guild''s decret.'
-                                   image_data = lcl_image_library=>congratulation( ) ).
+                                      descr = 'the Guild''s decret.'
+                                      image_data = lcl_library=>congratulation( ) ).
       engine->player->location = guild.
-      result->success_msg( title = 'Mission completed'
-                           subtitle = 'You did it!'
-                           description = |Congratulations, you are now a member of the Wizard's Guild.| ).
+      log->success_msg( title = 'Mission completed'
+                        subtitle = 'You did it!'
+                        description = |Congratulations, you are now a member of the Wizard's Guild.| ).
     ENDIF.
 
-    results = result->get( ).
     current_location = |You are in { engine->player->location->description }|.
-
+    anzahl_items = lines( engine->player->get_list( ) ).
     image_data = engine->player->location->get_image( ).
-    messages = result->t_msg.
+
+    messages = log->t_msg.
+    results = log->get( ).
+
   ENDMETHOD.
 
   METHOD init_game.
-    DATA(repository) = NEW zcl_axage_repository( ).
-    engine = NEW #( repository ).
+    engine = NEW #( ).
     " Nodes
     DATA(living_room) = engine->new_room(
                              name = 'Living Room'
                              descr = 'the living-room of a wizard''s house.'
-                             image_data = lcl_image_library=>living_room( ) ).
+                             image_data = lcl_library=>living_room( ) ).
     DATA(attic)  = engine->new_room( name = 'Attic'
                                      descr = 'the attic.'
-                                     image_data = lcl_image_library=>attic( )
+                                     image_data = lcl_library=>attic( )
                                      dark = abap_true
                                      state = 'The attic is dark' ).
     DATA(garden) = engine->new_room( name = 'Garden'
                                        descr = 'a beautiful garden.'
-                                       image_data = lcl_image_library=>garden( ) ).
+                                       image_data = lcl_library=>garden( ) ).
     DATA(pond) = engine->new_room( name = 'Pond'
                                    descr = 'a pond with a frog'
                                    state = 'The pond is dark'
                                    dark = abap_true
-                                   image_data = lcl_image_library=>pond( ) ).
+                                   image_data = lcl_library=>pond( ) ).
     engine->map->add_room( living_room ).
     engine->map->add_room( attic ).
     engine->map->add_room( garden ).
@@ -251,7 +253,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     DATA(needed_to_open_fireplace) = engine->new_node( 'FirePlaceOpener' ).
 
-    DATA(fireplace) = NEW zcl_axage_openable_thing(
+    DATA(fireplace) = NEW ycl_axage_openable_thing(
       name = 'FIREPLACE'
       descr = 'carved with arcane symbols'
       state = 'its grate is filled with ashes'
@@ -259,7 +261,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       can_be_drop = abap_false
       content = content_of_fireplace
       needed  = needed_to_open_fireplace
-      repository = engine->repository ).
+      repository = engine ).
     living_room->add( fireplace ).
 
     DATA(bookshelf_key) = engine->new_object( name = 'KEY' descr = 'it is small' ).
@@ -270,12 +272,12 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     DATA(content_of_tome) = engine->new_node( 'BookContent' ).
     content_of_tome->add( engine->new_spell( name = 'LUMI' prefix = ''
        descr = '"Illuminara", a spell which can light up dark places.' ) ).
-    DATA(tome) = NEW zcl_axage_openable_thing(
+    DATA(tome) = NEW ycl_axage_openable_thing(
       name    = 'TOME'
       descr   = 'Magic Tome with arcane spells'
       content = content_of_tome
       needed  = needed_to_open_tome
-      repository = engine->repository ).
+      repository = engine ).
 
     DATA(content_of_bookshelf) = engine->new_node( 'BookshelfContent' ).
     content_of_bookshelf->add( tome ).
@@ -283,10 +285,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     DATA(needed_to_open_bookshelf) = engine->new_node( 'BookshelfOpener' ).
     needed_to_open_bookshelf->add( bookshelf_key ).
 
-    DATA(bookshelf) = NEW zcl_axage_openable_thing( name = 'BOOKSHELF'
+    DATA(bookshelf) = NEW ycl_axage_openable_thing( name = 'BOOKSHELF'
                            descr = 'with magic tomes'
                            state = 'closed'
-                           repository = engine->repository
+                           repository = engine
                            can_be_open = abap_true
                            can_be_pickup = abap_false
                            can_be_drop = abap_false
@@ -299,6 +301,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
      can_be_pickup = abap_false
      can_be_drop = abap_false ).
     living_room->add( painting ).
+
+    DATA(letter) = engine->new_object( name = 'LETTER' state = 'from the Wizard''s Guild'
+       descr = lcl_library=>intro( )  ).
+    living_room->add( letter ).
 
     " ATTIC**:
 
@@ -317,10 +323,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     DATA(needed_to_open_chest) = engine->new_node( 'ChestOpener' ).
     " needed_to_open_chest->add( ).
 
-    DATA(chest) = NEW zcl_axage_openable_thing( name = 'CHEST'
+    DATA(chest) = NEW ycl_axage_openable_thing( name = 'CHEST'
                            descr = 'large'
                            state = 'closed'
-                           repository = engine->repository
+                           repository = engine
                            can_be_open = abap_true
                            can_be_pickup = abap_false
                            can_be_drop = abap_false
@@ -360,7 +366,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     DATA(needed_to_open_flowerbed) = engine->new_node( 'FlowerbedOpener' ).
 
-    DATA(flowerbed) = NEW zcl_axage_openable_thing(
+    DATA(flowerbed) = NEW ycl_axage_openable_thing(
       name = 'FLOWERBED'
       descr = 'a flower bed'
       state = 'filled with flowers'
@@ -368,7 +374,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       can_be_drop = abap_false
       content = content_of_flowerbed
       needed  = needed_to_open_flowerbed
-      repository = engine->repository ).
+      repository = engine ).
     garden->add( flowerbed ).
 
     DATA(content_of_shed) = engine->new_node( 'ShedContent' ).
@@ -376,10 +382,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
     DATA(needed_to_open_shed) = engine->new_node( 'ShedOpener' ).
     needed_to_open_shed->add( Mooncrest_key ).
 
-    DATA(shed) = NEW zcl_axage_openable_thing( name = 'SCHED'
+    DATA(shed) = NEW ycl_axage_openable_thing( name = 'SCHED'
                            descr = 'in the garden'
                            state = 'closed'
-                           repository = engine->repository
+                           repository = engine
                            can_be_open = abap_true
                            can_be_pickup = abap_false
                            can_be_drop = abap_false
@@ -435,7 +441,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
         ( descr = 'Dunk <subject> <object>'  value = 'DUNK' )
         ( descr = 'Splash <subject> <object>'  value = 'SPLASH' ) ).
 
-    help_html = create_help_html( ).
+    formatted_text = create_help_html( ).
   ENDMETHOD.
 
 
@@ -445,7 +451,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
        )->dialog(
        "contentheight = '200px'
        contentwidth  = '500px'
-       title = 'Setup Player'
+       title = 'Player Profile'
        )->content(
            )->simple_form(
                )->label( 'Guild Aspirant''s Name'
@@ -465,13 +471,21 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
   ENDMETHOD.
 
+  METHOD set_focus.
+    app-s_next-s_cursor  = VALUE #( BASE app-s_next-s_cursor
+                                    id = c_id_command
+                                    cursorpos = '1'
+                                    selectionstart = '1'
+                                    selectionend = '1' ).
+  ENDMETHOD.
+
   METHOD z2ui5_if_app~main.
     app-client = client.
     app-s_get = client->get( ).
 
     IF app-check_initialized = abap_false.
       app-check_initialized = abap_true.
-      command = 'MAP'.
+      command = 'LOOK at LETTER'.
       init_game( ).
       help = engine->interprete( 'HELP' )->get( ).
 
@@ -488,7 +502,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
       WHEN 'BUTTON_POST'.
         client->popup_message_toast( |{ command } - send to the server| ).
         execute( command ).
-        app-s_next-s_cursor  = VALUE #( id = 'id_command' cursorpos = '1' selectionstart = '1' selectionend = '1' ).
+        set_focus( ).
 
       WHEN 'POPUP_SETUP_PLAYER'.
         player_name = engine->player->name.
@@ -531,6 +545,10 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                             value   = anzahl_items
                             visible = abap_true
         )->get_parent( )->get_parent(
+        )->button(
+           text  = 'Profile'
+           icon  = 'sap-icon://account'
+           press = client->_event( 'POPUP_SETUP_PLAYER' )
 
         )->toolbar_spacer(
 
@@ -578,7 +596,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
               customtextoff = 'No'
             )->label( 'Command'
             )->input(
-                    id              = 'id_command'
+                    id              = c_id_command
                     showClearIcon   = abap_true
                     submit          = client->_event( `BUTTON_POST` )
                     value           = client->_bind( command )
@@ -595,7 +613,22 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                )->hbox( justifycontent = `SpaceBetween`
                   )->button(
                      text = `Go` press = client->_event( `BUTTON_POST` )
-                     type = `Emphasized` ).
+                     type = `Emphasized`
+             )->get_parent( )->get_parent(
+
+
+             )->get_parent(
+
+              )->scroll_container( height = '40%' vertical = abap_true focusable = abap_false
+             )->message_view(
+                 items = client->_bind( messages )
+                 groupitems = abap_true
+                 )->message_item(
+                     type        = `{TYPE}`
+                     title       = `{TITLE}`
+                     subtitle    = `{SUBTITLE}`
+                     description = `{DESCRIPTION}`
+                     groupname   = `{GROUP}` ).
 
     IF image_data IS NOT INITIAL.
 
@@ -605,7 +638,6 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
                 )->formatted_text( Current_Location
         )->image( src = image_data ).
 
-      " page->image( src = image_data ).
     ENDIF.
 
     " page->grid( 'L8 M8 S8' )->content( 'layout' ).
@@ -619,17 +651,7 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     grid2->simple_form( title = 'Quest for a Wizard''s Guild Aspirant' editable = abap_true )->content( 'form'
          )->vbox( 'sapUiSmallMargin'
-                )->formatted_text( help_html ).
-
-    page->message_view(
-         items = client->_bind( messages )
-         groupitems = abap_true
-         )->message_item(
-             type        = `{TYPE}`
-             title       = `{TITLE}`
-             subtitle    = `{SUBTITLE}`
-             description = `{DESCRIPTION}`
-             groupname   = `{GROUP}` ).
+                )->formatted_text( formatted_text ).
 
     page->footer(
             )->overflow_toolbar(
@@ -653,15 +675,16 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
             press = client->_event( 'ASK' )
             enabled = abap_false
             icon = 'sap-icon://travel-request'
+        )->button(
+            text  = 'Cast'
+            press = client->_event( 'CAST' )
+            enabled = abap_false
+            icon = 'sap-icon://activate'
 *        )->button(
 *            text  = 'Weld'
 *            press = client->_event( 'WELD' )
 *            enabled = abap_true
                 )->toolbar_spacer(
-        )->button(
-           text  = 'Player'
-           icon  = 'sap-icon://account'
-           press = client->_event( 'POPUP_SETUP_PLAYER' )
         )->link(
              text = 'Credits'
              href  = 'https://github.com/Ennowulff/axage'
@@ -684,7 +707,9 @@ CLASS ZCL_AXAGE_WIZARD_UI IMPLEMENTATION.
 
     ENDCASE.
 
+    set_focus( ).
     client->set_next( app-s_next ).
+
     app-view_popup = ``.
     CLEAR app-s_next.
   ENDMETHOD.
